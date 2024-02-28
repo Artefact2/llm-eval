@@ -1,0 +1,76 @@
+#!/usr/bin/env php
+<?php
+/* Copyright 2024 Romain "Artefact2" Dal Maso <romain.dalmaso@artefact2.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+if($argc !== 5) {
+	fprintf(STDERR, "Usage: %s <model.gguf> <instruct-prefix> <instruct-suffix> <stop-sequences>\n", $argv[0]);
+	die(1);
+}
+list(, $model, $prefix, $suffix, $stops) = $argv;
+
+if(pcntl_fork() === 0) {
+	passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -ngl 999 -m '.escapeshellarg($model));
+} else {
+	register_shutdown_function(function() {
+		posix_kill(0, SIGTERM);
+	});
+	do {
+		sleep(2);
+		$status = @json_decode(file_get_contents('http://127.0.0.1:24498/health'), true);
+	} while(($status['status'] ?? "error") !== "ok");
+}
+
+require __DIR__.'/common.php';
+
+$model = pathinfo($model, \PATHINFO_FILENAME);
+
+$pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
+LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
+WHERE answers.prompt_id IS NULL;');
+$pq->bindValue(':model', $model);
+$prompts = $pq->execute();
+
+$ins_stmt = $db->prepare('INSERT INTO answers(prompt_id, model_name, answer) VALUES(:pid, :model, :answer);');
+$ins_stmt->bindValue(':model', $model);
+$ins_stmt->bindParam(':pid', $prompt_id);
+$ins_stmt->bindParam(':answer', $answer);
+
+while($row = $prompts->fetchArray()) {
+	$ctx = stream_context_create([
+		'http' =>  [
+			'method' => 'POST',
+			'timeout' => 300,
+			'header' => 'Content-Type: application/json',
+			'content' => json_encode([
+				'prompt' => $prefix.$row['prompt'].$suffix,
+				'n_predict' => 512,
+				'samplers' => 'min_p',
+				'min_p' => 0.05,
+				'repeat_penalty' => 1.0,
+				'seed' => 42,
+				'stop' => $stops,
+			]),
+		],
+	]);
+	$ans = file_get_contents('http://127.0.0.1:24498/completion', false, $ctx);
+	if($ans === false) {
+		var_dump($row);
+		die(1);
+	}
+	$prompt_id = $row['prompt_id'];
+	$answer = json_decode($ans, true)['content'];
+	$ins_stmt->execute();
+}

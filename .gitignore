@@ -1,0 +1,5 @@
+db.sqlite*
+llama.cpp
+llama.log
+models
+prompts.json
