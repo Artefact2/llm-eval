@@ -6,11 +6,12 @@
     <meta name="robots" content="noindex" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="bootstrap.css" />
+    <link rel="icon" href="favicon.png" />
     <script src="bootstrap.js" defer="defer" />
     <script src="jquery.js" defer="defer" />
     <script src="frontend.js" defer="defer" />
   </head>
-  <body>
+  <body style="min-height: 100vh; background-image: url(background-kobold.avif); background-repeat: no-repeat; background-size: 35vmin 35vmin; background-position: bottom right;">
     <div id="disclaimer-modal" class="modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
@@ -67,7 +68,7 @@
 
     <nav class="navbar navbar-expand-sm bg-body-tertiary">
       <div class="container-fluid">
-        <a class="navbar-brand" href="#">llm-eval</a>
+        <a class="navbar-brand" href="#play"><img src="favicon.png" style="height: 1.5em; vertical-align: middle; border-radius: 0.5em;" /> llm-eval</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -90,20 +91,82 @@
       </div>
     </nav>
 
-    <div id="play" class="container d-none">
-      <h1>Play!</h1>
-    </div>
-
-    <div id="results" class="container d-none">
-      <h1>My results for this session</h1>
-      <h1>All results</h1>
-    </div>
-
     <div class="alert alert-primary" role="alert" id="javascript-check">
       <strong>
         Scripts are loading, please wait!
       </strong>
       If this message doesn't disappear after a few seconds, make sure Javascript is enabled in your browser.
     </div>
+
+    <div class="alert alert-warning">
+      <strong>
+        This service is still being developed!
+      </strong>
+      Expect things to break or change at any moment. Thank you for testing!
+    </div>
+
+    <section id="play" class="container d-none mt-4">
+      <div class="accordion" id="model-select" style="--bs-accordion-bg: hsla(0, 50%, 100%, 90%);">
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button d-flex" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+              <span class="flex-grow-1">Select models...</span>
+              <span class="badge text-bg-primary me-2">
+                <div class="spinner-border spinner-border-sm" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </span>
+            </button>
+          </h2>
+          <div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#model-select">
+            <div class="accordion-body">
+              <p>Select at least two models in the list below. Use control/shift click to select multiple entries.</p>
+              <form>
+                <select class="form-select" multiple="multiple" size="10">
+                  <option value="" disabled="disabled">Fetching the model list...</option>
+                </select>
+                <button class="btn btn-primary mt-2" disabled="disabled">I've made my choice!</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="accordion-item" id="voting-ui">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+              Cast votes...
+            </button>
+          </h2>
+          <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#model-select">
+            <div class="accordion-body container">
+              <div class="row overflow-y-scroll" style="height: 66vh;">
+                <div class="col-6 pe-2" id="voting-ui-a">
+                  <div class="alert alert-primary prompt" style="white-space: pre-wrap;"></div>
+                  <div class="alert alert-secondary answer" style="white-space: pre-wrap;"></div>
+                </div>
+                <div class="col-6 ps-2" id="voting-ui-b">
+                  <div class="alert alert-primary prompt" style="white-space: pre-wrap;"></div>
+                  <div class="alert alert-secondary answer" style="white-space: pre-wrap;"></div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="d-flex justify-content-between">
+                  <button id="vote-a" class="btn btn-primary" disabled="disabled">Left is better!</button>
+                  <span>
+                    <button id="vote-draw" class="btn btn-secondary" disabled="disabled">It's a draw!</button>
+                    <button id="vote-skip" class="btn btn-secondary" disabled="disabled">Skip this prompt</button>
+                  </span>
+                  <button id="vote-b" class="btn btn-primary" disabled="disabled">Right is better!</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="container d-none mt-4">
+      <h1>My results for this session</h1>
+      <h1>All results</h1>
+    </section>
   </body>
 </html>
