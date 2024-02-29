@@ -73,16 +73,21 @@ if($_GET['a'] === 'models') {
 	die();
 }
 
+function hmac($anything): string {
+	global $config;
+	return hash_hmac('sha256', json_encode($anything), $config['hmac_secret']);
+}
+
 function get_session_id(): int|false {
-	global $db, $config;
+	global $db;
 	$ip = inet_pton($_SERVER['REMOTE_ADDR']);
 	if($ip === false) return false;
 	/* ipv4: keep entire address (4 bytes) */
 	/* ipv6: keep /48 prefix (6 bytes) */
-	$ip = hash_hmac('sha256', substr($ip, 6), $config['hmac_secret']);
+	$ip = hmac(substr($ip, 6));
 	$ua = $_SERVER['HTTP_USER_AGENT'] ?? false;
 	if($ua === false) return false;
-	$ua = hash_hmac('sha256', $ua, $config['hmac_secret']);
+	$ua = hmac($ua);
 	$db->exec('BEGIN;');
 	$sid = $db->querySingle('SELECT session_id FROM sessions WHERE ip_addr =\''.$ip.'\' AND user_agent = \''.$ua.'\'');
 	if($sid === false) return false;
@@ -110,7 +115,31 @@ if($_GET['a'] === 'get-voting-pair') {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
 	}
-	$reply = [ 'status' => 'ok', 'sid' => $sid ];
+	$p = $db->prepare('SELECT session_id, prompt_id, model_name_a, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_name_a IN (SELECT value FROM json_each(:models)) AND model_name_b IN (SELECT value FROM json_each(:models)) ORDER BY random() LIMIT 1;');
+	$p->bindValue(':sid', $sid);
+	$p->bindValue(':models', json_encode($models));
+	$pair = $p->execute()->fetchArray(\SQLITE3_ASSOC);
+	if(!isset($pair['prompt_id'])) {
+		$reply = [ 'status' => 'server-error', 'error' => 'failed to fetch a voting pair' ];
+		die();
+	}
+
+	/* deterministically swap the answer, 50% of the time */
+	if(ord(hmac([ $pair['session_id'], $pair['answer_a'], $pair['answer_b'] ])) < 128) {
+		$old = $pair['answer_a'];
+		$pair['answer_a'] = $pair['answer_b'];
+		$pair['answer_b'] = $old;
+	}
+
+	foreach([ 'prompt', 'answer_a', 'answer_b' ] as $k) {
+		$pair[$k] = trim($pair[$k]);
+	}
+
+	$reply = [
+		'status' => 'ok',
+		'pair' => $pair,
+		'hmac' => hmac($pair),
+	];
 	die();
 }
 

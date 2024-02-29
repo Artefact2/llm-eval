@@ -138,17 +138,18 @@
           </h2>
           <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#model-select">
             <div class="accordion-body container">
-              <div class="row overflow-y-scroll" style="height: 66vh;">
-                <div class="col-6 pe-2" id="voting-ui-a">
-                  <div class="alert alert-primary prompt" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
-                  <div class="alert alert-secondary answer" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+              <div class="row overflow-y-scroll align-items-top" style="height: 66vh;">
+                <div class="col-12">
+                  <div class="alert alert-primary text-center" id="voting-ui-prompt" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
-                <div class="col-6 ps-2" id="voting-ui-b">
-                  <div class="alert alert-primary prompt" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
-                  <div class="alert alert-secondary answer" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                <div class="col-6 pe-1">
+                  <div class="alert alert-secondary" id="voting-ui-a" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                </div>
+                <div class="col-6 pb-1">
+                  <div class="alert alert-secondary" id="voting-ui-b" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
               </div>
-              <div class="row">
+              <div class="row mt-4">
                 <div class="d-flex justify-content-between">
                   <button id="vote-a" class="btn btn-lg btn-primary" disabled="disabled">Left is better!</button>
                   <span>

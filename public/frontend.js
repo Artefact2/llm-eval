@@ -53,7 +53,14 @@ const load_voting_pair = () => {
 		a: 'get-voting-pair',
 		models: JSON.stringify(selected_vals),
 	}, data => {
-		console.log(data);
+		/* XXX: add fancy animations */
+		$("div#voting-ui").data('current-pair', data);
+		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty();
+		$("div#voting-ui-prompt").append(document.createTextNode(data.pair.prompt));
+		$("div#voting-ui-a").append(document.createTextNode(data.pair.answer_a));
+		$("div#voting-ui-b").append(document.createTextNode(data.pair.answer_b));
+		$("div#voting-ui button").prop('disabled', false);
+
 	});
 };
 
@@ -98,6 +105,7 @@ $(() => {
 		if($("div#voting-ui div.spinner-border").length === 0) return;
 		load_voting_pair();
 	});
+	$("button#vote-skip").on('click', load_voting_pair);
 
 	$("section#results").on('my-show', () => {
 		/* fetch votes from backend */
