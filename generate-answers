@@ -19,11 +19,18 @@ if($argc !== 5) {
 	fprintf(STDERR, "Usage: %s <model.gguf> <instruct-prefix> <instruct-suffix> <stop-sequences>\n", $argv[0]);
 	die(1);
 }
-list(, $model, $prefix, $suffix, $stops) = $argv;
+list(, $model_path, $prefix, $suffix, $stops) = $argv;
 
-if(pcntl_fork() === 0) {
-	passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -ngl 999 -m '.escapeshellarg($model));
-} else {
+function spawn_server(string $model_path): void {
+	static $spawned = false;
+	if($spawned === true) return;
+	$spawned = true;
+	if(pcntl_fork() === 0) {
+		global $config;
+		$server_args = $config['server_args']($model_path);
+		passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -m '.escapeshellarg($model_path)).' '.$server_args;
+		die(0);
+	}
 	register_shutdown_function(function() {
 		posix_kill(0, SIGTERM);
 	});
@@ -35,7 +42,7 @@ if(pcntl_fork() === 0) {
 
 require __DIR__.'/common.php';
 
-$model = pathinfo($model, \PATHINFO_FILENAME);
+$model = pathinfo($model_path, \PATHINFO_FILENAME);
 
 $pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
 LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
@@ -49,6 +56,7 @@ $ins_stmt->bindParam(':pid', $prompt_id);
 $ins_stmt->bindParam(':answer', $answer);
 
 while($row = $prompts->fetchArray()) {
+	spawn_server($model_path);
 	$ctx = stream_context_create([
 		'http' =>  [
 			'method' => 'POST',

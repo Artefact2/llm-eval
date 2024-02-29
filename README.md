@@ -13,6 +13,9 @@ make -C llama.cpp server
 
 sqlite3 db.sqlite < schema.sql
 
+cp config{-example,}.php
+$EDITOR config.php
+
 # prompts.json should be an array of strings
 ./import-prompts < prompts.json
 

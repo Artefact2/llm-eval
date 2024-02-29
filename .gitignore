@@ -1,3 +1,4 @@
+config.php
 db.sqlite*
 llama.cpp
 llama.log
