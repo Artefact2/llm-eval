@@ -113,7 +113,7 @@ function get_session_id(): int|false {
 
 function should_swap(int $sid, string $ans_a, string $ans_b): bool {
 	/* deterministically returns true about 50% of the time */
-	return ord(hmac([ $sid, $ans_a, $ans_b ])) < 128;
+	return preg_match('/^[0-7]/', hmac([ $sid, $ans_a, $ans_b ]));
 }
 
 if($payload['a'] === 'get-voting-pair') {
