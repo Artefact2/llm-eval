@@ -88,15 +88,25 @@ function get_session_id(): int|false {
 	$ua = $_SERVER['HTTP_USER_AGENT'] ?? false;
 	if($ua === false) return false;
 	$ua = hmac($ua);
-	$db->exec('BEGIN;');
-	$sid = $db->querySingle('SELECT session_id FROM sessions WHERE ip_addr =\''.$ip.'\' AND user_agent = \''.$ua.'\'');
+	$sid = $db->querySingle($sql = 'SELECT session_id FROM sessions WHERE ip_addr =\''.$ip.'\' AND user_agent = \''.$ua.'\';');
 	if($sid === false) return false;
 	if($sid !== null) return $sid;
-	if($db->exec('INSERT INTO sessions(ip_addr, user_agent, timestamp) VALUES(\''.$ip.'\', \''.$ua.'\', '.time().');') === false) return false;
+	if(begin_immediate($db) === false) return false;
+	$sid = $db->querySingle($sql);
+	if($sid === false) return false;
+	if($sid !== null) {
+		$db->exec('ROLLBACK;');
+		return $sid;
+	}
+	if($db->exec('INSERT INTO sessions(ip_addr, user_agent, timestamp) VALUES(\''.$ip.'\', \''.$ua.'\', '.time().');') === false) {
+		$db->exec('ROLLBACK;');
+		return false;
+	}
 	$sid = $db->lastInsertRowID();
 	if($sid > 0 && $db->exec('COMMIT;') !== false) {
 		return $sid;
 	}
+	$db->exec('ROLLBACK;');
 	return false;
 }
 

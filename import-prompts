@@ -19,7 +19,11 @@ require __DIR__.'/common.php';
 
 $json = json_decode(file_get_contents('php://stdin'), true);
 
-$db->exec('BEGIN;');
+if(begin_immediate($db) === false) {
+	fprintf(STDERR, "%s: could not begin immediate transaction\n", $argv[1]);
+	die(1);
+}
+
 $stmt = $db->prepare('INSERT INTO prompts(prompt) VALUES(:prompt);');
 $stmt->bindParam(':prompt', $prompt);
 
