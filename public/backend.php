@@ -45,15 +45,16 @@ if($_SERVER['REQUEST_METHOD'] !== 'POST') {
 	die();
 }
 
-if(!isset($_GET['a'])) {
+$payload = json_decode(file_get_contents('php://input'), true);
+if(!is_array($payload) || !isset($payload['a'])) {
 	$reply = [
 		'status' => 'client-error',
-		'error' => 'no action',
+		'error' => 'payload parse error or no action specified',
 	];
 	die();
 }
 
-if($_GET['a'] === 'models') {
+if($payload['a'] === 'models') {
 	require realpath(__DIR__).'/../common.php';
 	$q = $db->query('SELECT model_name FROM models ORDER BY model_name ASC;');
 	if($q === false) {
@@ -110,9 +111,14 @@ function get_session_id(): int|false {
 	return false;
 }
 
-if($_GET['a'] === 'get-voting-pair') {
+function should_swap(int $sid, string $ans_a, string $ans_b): bool {
+	/* deterministically returns true about 50% of the time */
+	return ord(hmac([ $sid, $ans_a, $ans_b ])) < 128;
+}
+
+if($payload['a'] === 'get-voting-pair') {
 	require realpath(__DIR__).'/../common.php';
-	$models = json_decode($_GET['models'], true);
+	$models = $payload['models'];
 	if(!is_array($models) || count($models) < 2) {
 		$reply = [
 			'status' => 'client-error',
@@ -134,8 +140,7 @@ if($_GET['a'] === 'get-voting-pair') {
 		die();
 	}
 
-	/* deterministically swap the answer, 50% of the time */
-	if(ord(hmac([ $pair['session_id'], $pair['answer_a'], $pair['answer_b'] ])) < 128) {
+	if(should_swap($pair['session_id'], $pair['answer_a'], $pair['answer_b'])) {
 		$old = $pair['answer_a'];
 		$pair['answer_a'] = $pair['answer_b'];
 		$pair['answer_b'] = $old;
@@ -153,8 +158,35 @@ if($_GET['a'] === 'get-voting-pair') {
 	die();
 }
 
-if($_GET['a'] === 'submit-voting-pair') {
+if($payload['a'] === 'submit-voting-pair') {
 	require realpath(__DIR__).'/../common.php';
+	if(hmac($payload['pair']) !== $payload['hmac']) {
+		$reply = [
+			'status' => 'client-error',
+			'error' => 'hmac mismatch',
+		];
+		die();
+	}
+	if(isset($payload['vote']) && should_swap($payload['pair']['session_id'], $payload['pair']['answer_a'], $payload['pair']['answer_b'])) {
+		$payload['vote'] = -$payload['vote'];
+	}
+	/* XXX: implement rate limiting */
+	/* let the db constraint check for vote in [-1,0,1] */
+	$stmt = $db->prepare('INSERT INTO votes(session_id, prompt_id, model_name_a, model_name_b, vote, timestamp) VALUES(:sid, :pid, :mna, :mnb, :vote, :ts);');
+	$stmt->bindValue(':sid', $payload['pair']['session_id']);
+	$stmt->bindValue(':pid', $payload['pair']['prompt_id']);
+	$stmt->bindValue(':mna', $payload['pair']['model_name_a']);
+	$stmt->bindValue(':mnb', $payload['pair']['model_name_b']);
+	$stmt->bindValue(':vote', $payload['vote']);
+	$stmt->bindValue(':ts', time());
+	if($stmt->execute() === false) {
+		$reply = [
+			'status' => 'server-error',
+			'error' => 'db failure',
+		];
+		die();
+	}
+	$reply = [ 'status' => 'ok' ];
 	die();
 }
 

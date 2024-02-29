@@ -25,9 +25,11 @@ const error_alert = message => {
 	$("body > nav.navbar").after(div);
 };
 
-const post = (params, success) => {
+const post = (params, success, complete) => {
 	$.post({
-		url: 'backend.php?' + (new URLSearchParams(params)).toString(),
+		url: 'backend.php',
+		data: JSON.stringify(params),
+		contentType: 'application/json; charset=utf-8',
 		dataType: 'json',
 		success: data => {
 			if(!("status" in data) || data.status !== "ok") {
@@ -40,6 +42,9 @@ const post = (params, success) => {
 			error_alert("Backend request errored out (" + status + ": " + jqxhr.responseText + "). Open the console for more details.");
 			console.error(jqxhr);
 		},
+		complete: (jqxhr, status) => {
+			if(complete !== undefined) complete(jqxhr, status);
+		},
 	});
 };
 
@@ -51,7 +56,7 @@ const load_voting_pair = () => {
 	}
 	post({
 		a: 'get-voting-pair',
-		models: JSON.stringify(selected_vals),
+		models: selected_vals,
 	}, data => {
 		/* XXX: add fancy animations */
 		$("div#voting-ui").data('current-pair', data);
@@ -60,7 +65,26 @@ const load_voting_pair = () => {
 		$("div#voting-ui-a").append(document.createTextNode(data.pair.answer_a));
 		$("div#voting-ui-b").append(document.createTextNode(data.pair.answer_b));
 		$("div#voting-ui button").prop('disabled', false);
+	}, () => {
+                $("button#vote-skip").prop('disabled', false);
+	});
+};
 
+const submit_vote = score => {
+	/* XXX: add some kind of spinner/feedback */
+        $("div#voting-ui button").prop('disabled', true);
+
+	if(score === undefined) {
+		/* not actually voting, just skipping this prompt */
+		load_voting_pair();
+		return;
+	}
+
+	let cpair = $("div#voting-ui").data('current-pair');
+	cpair.a = 'submit-voting-pair';
+	cpair.vote = score;
+	post(cpair, load_voting_pair, () => {
+		$("div#voting-ui button").prop('disabled', false);
 	});
 };
 
@@ -105,7 +129,10 @@ $(() => {
 		if($("div#voting-ui div.spinner-border").length === 0) return;
 		load_voting_pair();
 	});
-	$("button#vote-skip").on('click', load_voting_pair);
+	$("button#vote-skip").on('click', () => { submit_vote(); });
+	$("button#vote-draw").on('click', () => { submit_vote(0); });
+	$("button#vote-a").on('click', () => { submit_vote(-1); });
+	$("button#vote-b").on('click', () => { submit_vote(1); });
 
 	$("section#results").on('my-show', () => {
 		/* fetch votes from backend */
