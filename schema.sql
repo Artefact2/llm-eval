@@ -28,6 +28,8 @@ timestamp INTEGER NOT NULL,
 PRIMARY KEY(session_id)
 );
 
+CREATE INDEX sessions_ip_addr_user_agent ON sessions(ip_addr, user_agent);
+
 CREATE TABLE votes (
 session_id INTEGER NOT NULL,
 prompt_id INTEGER NOT NULL,

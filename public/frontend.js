@@ -25,9 +25,9 @@ const error_alert = message => {
 	$("body > nav.navbar").after(div);
 };
 
-const post = (query, success) => {
+const post = (params, success) => {
 	$.post({
-		url: 'backend.php?' + query,
+		url: 'backend.php?' + (new URLSearchParams(params)).toString(),
 		dataType: 'json',
 		success: data => {
 			if(!("status" in data) || data.status !== "ok") {
@@ -37,9 +37,23 @@ const post = (query, success) => {
 			success(data);
 		},
 		error: (jqxhr, status) => {
-			error_alert("Backend request errored out (" + status + "). Open the console for more details.");
+			error_alert("Backend request errored out (" + status + ": " + jqxhr.responseText + "). Open the console for more details.");
 			console.error(jqxhr);
 		},
+	});
+};
+
+const load_voting_pair = () => {
+	let selected = $("div#model-select option").filter(':selected');
+	let selected_vals = [];
+	for(let opt of selected) {
+		selected_vals.push(opt.value);
+	}
+	post({
+		a: 'get-voting-pair',
+		models: JSON.stringify(selected_vals),
+	}, data => {
+		console.log(data);
 	});
 };
 
@@ -59,7 +73,7 @@ $(() => {
 				badge.empty();
 				badge.text(select.children(':selected').length + ' models selected');
 			});
-			post('a=models', data => {
+			post({ a: 'models' }, data => {
 				select.empty();
 				for(let model of data.models) {
 					let optn = $(document.createElement('option'));
@@ -78,6 +92,11 @@ $(() => {
 	$("div#model-select form").on('submit', function(e) {
 		e.preventDefault();
                 $("div#voting-ui button.accordion-button").click();
+	});
+
+	$("div#voting-ui button.accordion-button").on('click', function(e) {
+		if($("div#voting-ui div.spinner-border").length === 0) return;
+		load_voting_pair();
 	});
 
 	$("section#results").on('my-show', () => {
