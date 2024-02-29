@@ -21,4 +21,7 @@ $EDITOR config.php
 
 # args: path to model file, instruct prefix, instruct suffix, json array of stop sequences
 parallel -n1 -j1 --ungroup ./generate-answers {} '[INST]' '[/INST]' '["[/INST]"]' ::: models/*.gguf
+
+make fetch-deps
+make host
 ```

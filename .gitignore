@@ -4,3 +4,6 @@ llama.cpp
 llama.log
 models
 prompts.json
+public/bootstrap.css
+public/bootstrap.js
+public/jquery.js

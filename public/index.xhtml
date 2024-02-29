@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <title>llm-eval</title>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="bootstrap.css" />
+    <script src="bootstrap.js" defer="defer" />
+    <script src="jquery.js" defer="defer" />
+    <script src="frontend.js" defer="defer" />
+  </head>
+  <body>
+    <div id="disclaimer-modal" class="modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Disclaimer</h5>
+          </div>
+          <div class="modal-body container">
+            <div class="row">
+              <div class="col-lg-4">
+                <img src="caution.avif" alt="an anthropomorphic purple kobold, angry and furious, holding a sign that
+                                             says 'CAUTION!', simple white background" style="width: 100%;" />
+              </div>
+              <div class="col-lg-8">
+                <p>
+                  You will be asked to vote between two AI-generated anwers to the same prompt.
+                  Only continue if you agree to the rules below:
+                </p>
+                <ul>
+                  <li>
+                    <strong>
+                      I have reached the age of legal adulthood in my country.
+                    </strong>
+                    Some AI-generated answers will be inappropriate, offensive or sexual.
+                  </li>
+                  <li>
+                    <strong>
+                      I agree to have my votes logged.
+                    </strong>
+                    Logged details will include your IP address, your browser's user-agent string, and the time and date
+                    of each of your votes. The data is used for result analysis. IP addresses and user-agent strings
+                    will be expunged if the data is ever made public or shared with any other third-party.
+                  </li>
+                  <li>
+                    <strong>
+                      I will not abuse the system.
+                    </strong>
+                    Do not vote unfaithfully. Do not submit votes in an automated manner. Thank you!</li>
+                </ul>
+                <p>
+                  For data deletion, retrieval or other GDPR-related requests, send an e-mail
+                  to <tt class="text-break">artefact2 (plus) llmeval (at) gmail (dot) com</tt>.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+              I understand and agree
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="navbar navbar-expand-sm bg-body-tertiary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">llm-eval</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0 w-100">
+            <li class="nav-item">
+              <a class="nav-link" href="#play">Play!</a>
+            </li>
+            <li class="nav-item flex-grow-1">
+              <a class="nav-link" href="#results">See results</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="https://github.com/Artefact2/llm-eval">Source code (GitHub)</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="https://github.com/Artefact2/llm-eval/issues">Report issue</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div id="play" class="container d-none">
+      <h1>Play!</h1>
+    </div>
+
+    <div id="results" class="container d-none">
+      <h1>My results for this session</h1>
+      <h1>All results</h1>
+    </div>
+
+    <div class="alert alert-primary" role="alert" id="javascript-check">
+      <strong>
+        Scripts are loading, please wait!
+      </strong>
+      If this message doesn't disappear after a few seconds, make sure Javascript is enabled in your browser.
+    </div>
+  </body>
+</html>
