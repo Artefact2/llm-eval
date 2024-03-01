@@ -162,6 +162,45 @@ const submit_vote = score => {
 	});
 };
 
+const format_results_table = data => {
+	/* XXX: making a lot of assumptions here wrt model names */
+	let table_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
+	let row_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
+	let col_name = row_name;
+	let table = document.createElement('table'), tbody = document.createElement('tbody');
+	table.setAttribute('data-ts', (new Date()).getTime());
+	table.appendChild(tbody);
+	table.classList.add('table');
+	for(let a in data.results) {
+		let thead = document.createElement('thead');
+		let tr = document.createElement('tr');
+		let th = document.createElement('th');
+		th.append(document.createTextNode(table_name(a)));
+		tr.appendChild(th);
+		table.appendChild(thead);
+		thead.appendChild(tr);
+		for(let b in data.results[a]) {
+			let th = document.createElement('th');
+			th.appendChild(document.createTextNode(col_name(b)));
+			tr.appendChild(th);
+		}
+		break;
+	}
+	for(let a in data.results) {
+		let tr = document.createElement('tr');
+		let th = document.createElement('th');
+		th.append(document.createTextNode(row_name(a)));
+		tr.appendChild(th);
+		tbody.appendChild(tr);
+		for(let b in data.results[a]) {
+			let td = document.createElement('td');
+			td.appendChild(document.createTextNode(JSON.stringify(data.results[a][b])));
+			tr.appendChild(td);
+		}
+	}
+	return table;
+};
+
 $(() => {
 	$('div#javascript-check').remove();
 	marked.use(markedXhtml.markedXhtml());
@@ -210,10 +249,37 @@ $(() => {
 	$("button#vote-b").on('click', () => { submit_vote(1); });
 
 	$("section#results").on('my-show', () => {
-		/* fetch votes from backend */
-		/* do fancy math */
-		/* generate tables */
+		$("div#results-global").prev().find('button').click();
 	});
+	const maybe_refresh_results = a => {
+		let div = $("div#results-" + a);
+		let table = div.find('table');
+		if(table.length && ((new Date()).getTime() - parseInt(table.data('ts'))) < 10000) return;
+		let ch = div.children('div.accordion-body');
+                ch.fadeOut(200).promise().done(() => {
+                        ch.empty();
+			let spinner = document.createElement('div'), span = document.createElement('span');
+			spinner.setAttribute('class', 'spinner-border');
+			spinner.appendChild(span);
+			span.setAttribute('class', 'visually-hidden');
+			span.appendChild(document.createTextNode('Loading...'));
+			ch.empty().append(spinner);
+			ch.fadeIn(200);
+			post({ a: 'get-results-' + a }, data => {
+				ch.fadeOut(200).promise().done(() => {
+					ch.empty().append(format_results_table(data));
+					ch.fadeIn(200);
+				});
+			});
+		});
+	};
+	for(let a of [ "global", "session" ]) {
+		(a => {
+			$("div#results-" + a).prev().find('button').on('click', () => {
+				maybe_refresh_results(a);
+			});
+		})(a);
+	}
 
 	const show_section = (section_id, delay) => {
 		if(delay === undefined) delay = 250;

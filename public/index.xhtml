@@ -13,6 +13,7 @@
       div#voting-ui-prompt > *:last-child { margin-bottom: 0; }
       div#voting-ui-a .typewrite, div#voting-ui-b .typewrite { animation: typewrite forwards 1ms; opacity: 0; }
       @keyframes typewrite { 0% { opacity: 0; } 100% { opacity: 1; } }
+      section#results table { text-align: right; }
     </style>
   </head>
   <body style="min-height: 100vh; background-image: url(background-kobold.avif); background-repeat: no-repeat; background-size: 35vmin 35vmin; background-position: bottom right;">
@@ -176,14 +177,12 @@
       <div class="accordion" id="results-acco">
         <div class="accordion-item">
           <h2 class="accordion-header">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#results-global" aria-expanded="true" aria-controls="results-global">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#results-global" aria-expanded="false" aria-controls="results-global">
               Global results (all participants)...
             </button>
           </h2>
-          <div id="results-global" class="accordion-collapse collapse show" data-bs-parent="#results-acco">
-            <div class="accordion-body">
-              Coming soon!
-            </div>
+          <div id="results-global" class="accordion-collapse collapse" data-bs-parent="#results-acco">
+            <div class="accordion-body" />
           </div>
         </div>
         <div class="accordion-item">
@@ -193,9 +192,7 @@
             </button>
           </h2>
           <div id="results-session" class="accordion-collapse collapse" data-bs-parent="#results-acco">
-            <div class="accordion-body">
-              Coming soon!
-            </div>
+            <div class="accordion-body" />
           </div>
         </div>
       </div>
