@@ -111,9 +111,9 @@ function get_session_id(): int|false {
 	return false;
 }
 
-function should_swap(int $sid, string $ans_a, string $ans_b): bool {
+function should_swap(int $sid, int $pid, string $mna, string $mnb): bool {
 	/* deterministically returns true about 50% of the time */
-	return preg_match('/^[0-7]/', hmac([ $sid, $ans_a, $ans_b ]));
+	return preg_match('/^[0-7]/', hmac([ $sid, $pid, $mna, $mnb ]));
 }
 
 if($payload['a'] === 'get-voting-pair') {
@@ -140,7 +140,7 @@ if($payload['a'] === 'get-voting-pair') {
 		die();
 	}
 
-	if(should_swap($pair['session_id'], $pair['answer_a'], $pair['answer_b'])) {
+	if(should_swap($pair['session_id'], $pair['prompt_id'], $pair['model_name_a'], $pair['model_name_b'])) {
 		$old = $pair['answer_a'];
 		$pair['answer_a'] = $pair['answer_b'];
 		$pair['answer_b'] = $old;
@@ -167,7 +167,11 @@ if($payload['a'] === 'submit-voting-pair') {
 		];
 		die();
 	}
-	if(isset($payload['vote']) && should_swap($payload['pair']['session_id'], $payload['pair']['answer_a'], $payload['pair']['answer_b'])) {
+	if(isset($payload['vote']) && ($swap = should_swap(
+		$payload['pair']['session_id'],
+		$payload['pair']['prompt_id'],
+		$payload['pair']['model_name_a'],
+		$payload['pair']['model_name_b']))) {
 		$payload['vote'] = -$payload['vote'];
 	}
 	/* XXX: implement rate limiting */
@@ -186,7 +190,7 @@ if($payload['a'] === 'submit-voting-pair') {
 		];
 		die();
 	}
-	$reply = [ 'status' => 'ok' ];
+	$reply = [ 'status' => 'ok', 'swap' => $swap ];
 	die();
 }
 
