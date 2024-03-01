@@ -138,7 +138,7 @@
           </h2>
           <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#model-select">
             <div class="accordion-body container">
-              <div class="row overflow-y-scroll align-items-top" style="height: 66vh;">
+              <div class="row overflow-y-scroll align-items-top" style="height: calc(100vh - 500px); min-height: max(60vh, min(500px, 80vh));">
                 <div class="col-12">
                   <div class="alert alert-primary text-center" id="voting-ui-prompt" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
@@ -159,6 +159,7 @@
                   <button id="vote-b" class="btn btn-lg btn-primary" disabled="disabled">Right is better!</button>
                 </div>
               </div>
+              <div class="row" id="vote-feedback" />
             </div>
           </div>
         </div>

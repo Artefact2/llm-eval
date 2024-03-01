@@ -64,6 +64,7 @@ const load_voting_pair = () => {
 		$("div#voting-ui-prompt").append(document.createTextNode(data.pair.prompt));
 		$("div#voting-ui-a").append(document.createTextNode(data.pair.answer_a));
 		$("div#voting-ui-b").append(document.createTextNode(data.pair.answer_b));
+		$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
 		$("div#voting-ui button").prop('disabled', false);
 	}, () => {
                 $("button#vote-skip").prop('disabled', false);
@@ -83,7 +84,25 @@ const submit_vote = score => {
 	let cpair = $("div#voting-ui").data('current-pair');
 	cpair.a = 'submit-voting-pair';
 	cpair.vote = score;
-	post(cpair, load_voting_pair, () => {
+	post(cpair, data => {
+                let operand;
+		if(cpair.vote === -1)     operand = ' > ';
+		else if(cpair.vote === 0) operand = ' = ';
+		else                      operand = ' < ';
+		if(data.swap) {
+                        operand = cpair.pair.model_name_b + operand + cpair.pair.model_name_a;
+		} else {
+			operand = cpair.pair.model_name_a + operand + cpair.pair.model_name_b;
+		}
+                let alert = document.createElement('div'), strong = document.createElement('strong');
+		alert.setAttribute('class', 'alert alert-success mt-2');
+		alert.appendChild(document.createTextNode('Vote successful! '));
+		strong.appendChild(document.createTextNode(operand));
+		alert.appendChild(strong);
+		alert.appendChild(document.createTextNode(' for prompt ' + cpair.pair.prompt_id + '.'));
+		$("div#vote-feedback").empty().append(alert);
+		load_voting_pair();
+	}, () => {
 		$("div#voting-ui button").prop('disabled', false);
 	});
 };
