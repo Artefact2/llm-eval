@@ -28,7 +28,7 @@ function spawn_server(string $model_path): void {
 	if(pcntl_fork() === 0) {
 		global $config;
 		$server_args = $config['server_args']($model_path);
-		passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -m '.escapeshellarg($model_path)).' '.$server_args;
+		passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -m '.escapeshellarg($model_path).' '.$server_args);
 		die(0);
 	}
 	register_shutdown_function(function() {
