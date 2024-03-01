@@ -76,6 +76,10 @@ if($payload['a'] === 'models') {
 
 function hmac($anything): string {
 	global $config;
+	if(strlen($config['hmac_secret']) < 32) {
+		trigger_error('hmac_secret not long enough (needs at least 32 characters), update your settings.php', \E_USER_ERROR);
+		die(1);
+	}
 	return hash_hmac('sha256', json_encode($anything), $config['hmac_secret']);
 }
 
