@@ -57,11 +57,11 @@ const chop_text = (text, delay, delay_inc) => {
 		span.setAttribute('style', 'animation-delay: ' + delay + 'ms;');
 		return span;
 	};
-        let span = make_span(delay);
+	let span = make_span(delay);
 	delay += delay_inc;
 	for(let frag of chopped) {
 		span.appendChild(document.createTextNode(frag));
-                if(frag.match(/^(\p{P}|\p{Z})*$/u) === null) {
+		if(frag.match(/^(\p{P}|\p{Z})*$/u) === null) {
 			dfrag.appendChild(span);
 			span = make_span(delay);
 			delay += delay_inc;
@@ -74,7 +74,7 @@ const chop_text = (text, delay, delay_inc) => {
 const chop_element = (element, delay, delay_inc) => {
 	for(let i = 0; i < element.childNodes.length; ++i) {
 		let ch = element.childNodes[i];
-                if(ch.nodeType === 3) {
+		if(ch.nodeType === 3) {
 			/* text node */
 			let chopped = chop_text(ch.wholeText, delay, delay_inc);
 			element.replaceChild(chopped[0], ch);
@@ -99,7 +99,7 @@ const load_voting_pair = () => {
 		a: 'get-voting-pair',
 		models: selected_vals,
 	}, data => {
-                $("div#voting-ui").data('current-pair', data);
+		$("div#voting-ui").data('current-pair', data);
 		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").fadeOut(200).promise().done(() => {
 			$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty().fadeIn(200);
 			$("div#voting-ui-prompt").html(marked.parse(data.pair.prompt));
@@ -115,7 +115,7 @@ const load_voting_pair = () => {
 };
 
 const submit_vote = score => {
-        $("div#voting-ui button").prop('disabled', true);
+	$("div#voting-ui button").prop('disabled', true);
 	if(score === undefined) {
 		/* not actually voting, just skipping this prompt */
 		load_voting_pair();
@@ -135,16 +135,16 @@ const submit_vote = score => {
 	cpair.a = 'submit-voting-pair';
 	cpair.vote = score;
 	post(cpair, data => {
-                let operand;
+		let operand;
 		if(cpair.vote === -1)     operand = ' > ';
 		else if(cpair.vote === 0) operand = ' = ';
 		else                      operand = ' < ';
 		if(data.swap) {
-                        operand = cpair.pair.model_name_b + operand + cpair.pair.model_name_a;
+			operand = cpair.pair.model_name_b + operand + cpair.pair.model_name_a;
 		} else {
 			operand = cpair.pair.model_name_a + operand + cpair.pair.model_name_b;
 		}
-                let alert = document.createElement('div'), strong = document.createElement('strong');
+		let alert = document.createElement('div'), strong = document.createElement('strong');
 		alert.setAttribute('class', 'alert alert-success');
 		alert.appendChild(document.createTextNode('Vote successful! '));
 		strong.appendChild(document.createTextNode(operand));
@@ -155,18 +155,52 @@ const submit_vote = score => {
 		});
 		load_voting_pair();
 	}, () => {
-                setTimeout(() => {
+		setTimeout(() => {
 			$("div#voting-ui button").prop('disabled', false);
 			$("div#vote-feedback > div.spinner-outer").remove();
 		}, 5000);
 	});
 };
 
+const format_votes_results = (element, s_votes, n_prompts, n_votes) => {
+	if(n_votes === 0) {
+		/* no data */
+		return;
+	}
+	let f = s_votes / n_prompts;
+	/* worst case variance: 50% for(-1)/50% against(+1) votes, mean=0 stddev=1 */
+	/* use 3σ for close to 99% CI */
+	let s = 3.0 / Math.sqrt(n_prompts);
+        if(f < s && f > -s) {
+		element.appendChild(document.createTextNode('not significant'));
+                element.classList.add('text-body-tertiary');
+		return;
+	}
+	let p;
+	if(f >= 0) {
+		p = "Lose";
+		element.classList.add('text-danger');
+	} else {
+		p = "Win";
+		f = -f;
+		element.classList.add('text-success');
+	}
+	element.appendChild(document.createTextNode(
+		'p(' + p + ')='
+			+ (new Intl.NumberFormat(undefined, {style: "percent"})).format(f)
+			+ '±' + (new Intl.NumberFormat(undefined, {
+				style: "percent",
+				maximumFractionDigits: 2,
+				minimumFractionDigits: 2
+			}).format(s))
+	));
+};
+
 const format_results_table = data => {
 	/* XXX: making a lot of assumptions here wrt model names */
 	let table_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
 	let row_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
-	let col_name = row_name;
+	let col_name = k => 'vs ' + row_name(k);
 	let table = document.createElement('table'), tbody = document.createElement('tbody');
 	table.setAttribute('data-ts', (new Date()).getTime());
 	table.appendChild(tbody);
@@ -194,7 +228,7 @@ const format_results_table = data => {
 		tbody.appendChild(tr);
 		for(let b in data.results[a]) {
 			let td = document.createElement('td');
-			td.appendChild(document.createTextNode(JSON.stringify(data.results[a][b])));
+			format_votes_results(td, data.results[a][b][0], data.results[a][b][1], data.results[a][b][2])
 			tr.appendChild(td);
 		}
 	}
@@ -212,7 +246,7 @@ $(() => {
 		disclaimer_shown = true;
 
 		let badge = $("div#model-select").closest("div.accordion-item").find("span.badge");
-                if(badge.find('div.spinner-border').length) {
+		if(badge.find('div.spinner-border').length) {
 			let select = $("div#model-select select");
 			select.on('change', () => {
 				badge.empty();
@@ -236,7 +270,7 @@ $(() => {
 
 	$("div#model-select form").on('submit', function(e) {
 		e.preventDefault();
-                $("div#voting-ui").closest("div.accordion-item").find("button.accordion-button").click();
+		$("div#voting-ui").closest("div.accordion-item").find("button.accordion-button").click();
 	});
 
 	$("div#voting-ui").closest("div.accordion-item").find("button.accordion-button").on('click', function(e) {
@@ -249,6 +283,7 @@ $(() => {
 	$("button#vote-b").on('click', () => { submit_vote(1); });
 
 	$("section#results").on('my-show', () => {
+		if($("section#results div.collapse.show").length) return;
 		$("div#results-global").prev().find('button').click();
 	});
 	const maybe_refresh_results = a => {
@@ -256,8 +291,8 @@ $(() => {
 		let table = div.find('table');
 		if(table.length && ((new Date()).getTime() - parseInt(table.data('ts'))) < 10000) return;
 		let ch = div.children('div.accordion-body');
-                ch.fadeOut(200).promise().done(() => {
-                        ch.empty();
+		ch.fadeOut(200).promise().done(() => {
+			ch.empty();
 			let spinner = document.createElement('div'), span = document.createElement('span');
 			spinner.setAttribute('class', 'spinner-border');
 			spinner.appendChild(span);
@@ -275,15 +310,17 @@ $(() => {
 	};
 	for(let a of [ "global", "session" ]) {
 		(a => {
-			$("div#results-" + a).prev().find('button').on('click', () => {
-				maybe_refresh_results(a);
+			let div = $("div#results-" + a);
+			div.prev().find('button').on('click', () => {
+				/* XXX: also fires when hiding */
+                                maybe_refresh_results(a);
 			});
 		})(a);
 	}
 
 	const show_section = (section_id, delay) => {
 		if(delay === undefined) delay = 250;
-                $("body > section").fadeOut(delay).promise().done(() => {
+		$("body > section").fadeOut(delay).promise().done(() => {
 			$(document.getElementById(section_id))
 				.removeClass('d-none')
 				.hide()
@@ -294,8 +331,8 @@ $(() => {
 		});
 	};
 
-        addEventListener("hashchange", e => {
-                show_section(window.location.hash.substring(1));
+	addEventListener("hashchange", e => {
+		show_section(window.location.hash.substring(1));
 	});
 	if(window.location.hash.length > 1) {
 		show_section(window.location.hash.substring(1), 0);
