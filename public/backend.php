@@ -45,6 +45,15 @@ if($_SERVER['REQUEST_METHOD'] !== 'POST') {
 	die();
 }
 
+$config = require realpath(__DIR__).'/../config.php';
+if($config['whitelist']($_SERVER['REMOTE_ADDR']) === false && $config['blacklist']($_SERVER['REMOTE_ADDR']) === true) {
+	$reply = [
+		'status' => 'client-error',
+		'error' => 'ip has been blacklisted',
+	];
+	die();
+}
+
 $payload = json_decode(file_get_contents('php://input'), true);
 if(!is_array($payload) || !isset($payload['a'])) {
 	$reply = [

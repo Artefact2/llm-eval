@@ -7,4 +7,8 @@ return [
 	'server_args' => function(string $model_path): string {
 		return '-ngl 999';
 	},
+	/* if the whitelist returns true, access is allowed and the blacklist is not checked. */
+	'whitelist' => function(string $ip): bool { return false; },
+	/* if the blacklist returns true, access is denied. */
+	'blacklist' => function(string $ip): bool { return false; },
 ];

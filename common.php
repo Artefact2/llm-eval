@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-$config = require __DIR__.'/config.php';
+if(!isset($config)) {
+	$config = require __DIR__.'/config.php';
+}
 
 $db = new \SQLite3(__DIR__.'/db.sqlite', \SQLITE3_OPEN_READWRITE);
 $db->exec('PRAGMA journal_mode = WAL;');
