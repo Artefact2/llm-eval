@@ -36,9 +36,14 @@ function get_self_ip(): string|false {
 	if($ip !== null) return $ip;
 	$ip = trim_ip($_SERVER['REMOTE_ADDR']);
 	if($ip === false) return false;
-	/* keep 28 bits of entropy from the ip address. it's a good balance
-	 * between false positives and anonymity */
-	$ip = substr(hmac($ip), 0, 7);
+	if(strpos($_SERVER['REMOTE_ADDR'], ':') === false) {
+		/* keep 28 bits of entropy for ipv4 addresses. it's a good
+		 * balance between false positives and anonymity */
+		$ip = substr(hmac($ip), 0, 7);
+	} else {
+		/* for ipv6, keep 40 bits */
+		$ip = substr(hmac($ip), 0, 10);
+	}
 	return $ip;
 }
 
