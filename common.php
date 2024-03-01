@@ -19,6 +19,7 @@ $config = require __DIR__.'/config.php';
 $db = new \SQLite3(__DIR__.'/db.sqlite', \SQLITE3_OPEN_READWRITE);
 $db->exec('PRAGMA journal_mode = WAL;');
 $db->exec('PRAGMA busy_timeout = 15000;');
+$db->exec('PRAGMA foreign_keys = 1;');
 
 function begin_immediate($db): bool {
 	for($i = 0; $i < 5; ++$i) {
