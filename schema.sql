@@ -58,8 +58,17 @@ LEFT JOIN votes AS vb ON vb.session_id = sessions.session_id AND vb.prompt_id = 
 WHERE va.session_id IS NULL AND vb.session_id IS NULL; -- anti join already answered models
 
 CREATE VIEW results AS
-SELECT COUNT(session_id)
-FROM votes
-GROUP BY(model_name_a, model_name_b, vote);
+SELECT ma.model_name AS model_name_a, mb.model_name AS model_name_b,
+(SELECT COUNT(session_id) FROM votes WHERE votes.model_name_a = ma.model_name AND votes.model_name_b = mb.model_name AND vote = -1) AS votes_a,
+(SELECT COUNT(session_id) FROM votes WHERE votes.model_name_a = ma.model_name AND votes.model_name_b = mb.model_name AND vote = 0) AS votes_draw,
+(SELECT COUNT(session_id) FROM votes WHERE votes.model_name_a = ma.model_name AND votes.model_name_b = mb.model_name AND vote = 1) AS votes_b
+FROM models AS ma
+JOIN models AS mb ON ma.model_name < mb.model_name;
+
+CREATE TABLE rate_limit (
+ip_hash TEXT NOT NULL,
+timestamp REAL NOT NULL,
+PRIMARY KEY(ip_hash, timestamp)
+) WITHOUT ROWID;
 
 COMMIT;

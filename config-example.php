@@ -5,6 +5,9 @@ return [
 	'hmac_secret' => '',
 	/* will be passed to llama.cpp server binary */
 	'server_args' => function(string $model_path): string { return '-ngl 999'; },
+	/* rate limits: array of [ num_seconds => max_requests, ... ], set to
+	 * empty array [] to disable, keep sorted in descending key order */
+	'rate_limits' => [ 600 => 120, 180 => 60 ],
 	/* if the whitelist returns true, access is allowed and the blacklist is not checked. */
 	'whitelist' => function(string $ip): bool { return false; },
 	/* if the blacklist returns true, access is denied. */

@@ -14,75 +14,6 @@
  * limitations under the License.
  */
 
-header('Content-Type: application/json');
-
-/* should normally be overwritten */
-$reply = [
-	'status' => 'server-error',
-	'error' => 'backend did not generate a reply',
-];
-
-register_shutdown_function(function() use(&$reply) {
-	switch($reply['status'] ?? 'server-error') {
-	case 'ok':
-		break;
-	case 'client-error':
-		header('HTTP/1.1 400 Bad Request', true, 400);
-		break;
-	default:
-		header('HTTP/1.1 500 Internal Server Error', true, 500);
-	}
-
-	echo json_encode($reply);
-});
-
-
-if($_SERVER['REQUEST_METHOD'] !== 'POST') {
-	$reply = [
-		'status' => 'client-error',
-		'error' => 'only POST requests are allowed',
-	];
-	die();
-}
-
-$config = require realpath(__DIR__).'/../config.php';
-if($config['whitelist']($_SERVER['REMOTE_ADDR']) === false && $config['blacklist']($_SERVER['REMOTE_ADDR']) === true) {
-	$reply = [
-		'status' => 'client-error',
-		'error' => 'ip has been blacklisted',
-	];
-	die();
-}
-
-$payload = json_decode(file_get_contents('php://input'), true);
-if(!is_array($payload) || !isset($payload['a'])) {
-	$reply = [
-		'status' => 'client-error',
-		'error' => 'payload parse error or no action specified',
-	];
-	die();
-}
-
-if($payload['a'] === 'models') {
-	require realpath(__DIR__).'/../common.php';
-	$q = $db->query('SELECT model_name FROM models ORDER BY model_name ASC;');
-	if($q === false) {
-		$reply = [
-			'status' => 'server-error',
-			'error' => 'db error',
-		];
-		die();
-	}
-	$reply = [
-		'status' => 'ok',
-		'models' => [],
-	];
-	while($m = $q->fetchArray(\SQLITE3_NUM)) {
-		$reply['models'][] = $m[0];
-	}
-	die();
-}
-
 function hmac($anything): string {
 	global $config;
 	if(strlen($config['hmac_secret']) < 32) {
@@ -100,13 +31,20 @@ function trim_ip(string $ip): string|false {
 	return substr($ip, 6);
 }
 
-function get_session_id(): int|false {
-	global $db;
+function get_self_ip(): string|false {
+	static $ip = null;
+	if($ip !== null) return $ip;
 	$ip = trim_ip($_SERVER['REMOTE_ADDR']);
 	if($ip === false) return false;
 	/* keep 28 bits of entropy from the ip address. it's a good balance
 	 * between false positives and anonymity */
 	$ip = substr(hmac($ip), 0, 7);
+	return $ip;
+}
+
+function get_session_id($db): int|false {
+	$ip = get_self_ip();
+	if($ip === false) return false;
 	$ua = $_SERVER['HTTP_USER_AGENT'] ?? false;
 	if($ua === false) return false;
 	$ua = substr(hmac([
@@ -141,8 +79,113 @@ function should_swap(int $sid, int $pid, string $mna, string $mnb): bool {
 	return preg_match('/^[0-7]/', hmac([ $sid, $pid, $mna, $mnb ]));
 }
 
+
+
+header('Content-Type: application/json');
+
+/* should normally be overwritten */
+$reply = [
+	'status' => 'server-error',
+	'error' => 'backend did not generate a reply',
+];
+
+register_shutdown_function(function() use(&$reply) {
+	switch($reply['status'] ?? 'server-error') {
+	case 'ok':
+		break;
+	case 'client-error':
+		header('HTTP/1.1 400 Bad Request', true, 400);
+		break;
+	default:
+		header('HTTP/1.1 500 Internal Server Error', true, 500);
+	}
+
+	echo json_encode($reply);
+});
+
+
+
+if($_SERVER['REQUEST_METHOD'] !== 'POST') {
+	$reply = [
+		'status' => 'client-error',
+		'error' => 'only POST requests are allowed',
+	];
+	die();
+}
+
+
+
+/* get config before importing common, this avoids a db connection for
+ * blacklisted clients */
+$config = require realpath(__DIR__).'/../config.php';
+if($config['whitelist']($_SERVER['REMOTE_ADDR']) === false && $config['blacklist']($_SERVER['REMOTE_ADDR']) === true) {
+	$reply = [
+		'status' => 'client-error',
+		'error' => 'ip has been blacklisted',
+	];
+	die();
+}
+
+
+
+require realpath(__DIR__).'/../common.php';
+$ip = get_self_ip();
+foreach($config['rate_limits'] as $secs => $reqs) {
+	if($db->querySingle('SELECT COUNT(ip_hash) FROM rate_limit WHERE ip_hash=\''.$ip.'\' AND timestamp > (unixepoch() - '.$secs.');') > $reqs) {
+		$reply = [
+			'status' => 'client-error',
+			'error' => 'rate limit exceeded, try again in a few minutes'
+		];
+		die();
+	}
+}
+if($config['rate_limits'] !== []) {
+	if(begin_immediate($db) === false) {
+		$reply = [
+			'status' => 'server-error',
+			'error' => 'db error'
+		];
+		die();
+	}
+	$db->exec('INSERT INTO rate_limit(ip_hash, timestamp) VALUES(\''.$ip.'\', unixepoch(\'subsec\'));');
+	reset($config['rate_limits']);
+	$db->exec('DELETE FROM rate_limit WHERE timestamp < (unixepoch() - '.key($config['rate_limits']).');');
+	$db->exec('COMMIT;');
+}
+
+
+
+$payload = json_decode(file_get_contents('php://input'), true);
+if(!is_array($payload) || !isset($payload['a'])) {
+	$reply = [
+		'status' => 'client-error',
+		'error' => 'payload parse error or no action specified',
+	];
+	die();
+}
+
+
+
+if($payload['a'] === 'models') {
+	$q = $db->query('SELECT model_name FROM models ORDER BY model_name ASC;');
+	if($q === false) {
+		$reply = [
+			'status' => 'server-error',
+			'error' => 'db error',
+		];
+		die();
+	}
+	$reply = [
+		'status' => 'ok',
+		'models' => [],
+	];
+	while($m = $q->fetchArray(\SQLITE3_NUM)) {
+		$reply['models'][] = $m[0];
+	}
+	die();
+}
+
 if($payload['a'] === 'get-voting-pair') {
-	require realpath(__DIR__).'/../common.php';
 	$models = $payload['models'];
 	if(!is_array($models) || count($models) < 2) {
 		$reply = [
@@ -151,7 +194,7 @@ if($payload['a'] === 'get-voting-pair') {
 		];
 		die();
 	}
-	$sid = get_session_id();
+	$sid = get_session_id($db);
 	if($sid === false) {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
@@ -184,7 +227,6 @@ if($payload['a'] === 'get-voting-pair') {
 }
 
 if($payload['a'] === 'submit-voting-pair') {
-	require realpath(__DIR__).'/../common.php';
 	if(hmac($payload['pair']) !== $payload['hmac']) {
 		$reply = [
 			'status' => 'client-error',
