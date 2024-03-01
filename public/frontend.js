@@ -65,21 +65,28 @@ const load_voting_pair = () => {
 		$("div#voting-ui-a").append(document.createTextNode(data.pair.answer_a));
 		$("div#voting-ui-b").append(document.createTextNode(data.pair.answer_b));
 		$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
-		$("div#voting-ui button").prop('disabled', false);
+		setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
 	}, () => {
-                $("button#vote-skip").prop('disabled', false);
+		setTimeout(() => { $("button#vote-skip").prop('disabled', false); }, 5000);
 	});
 };
 
 const submit_vote = score => {
-	/* XXX: add some kind of spinner/feedback */
         $("div#voting-ui button").prop('disabled', true);
-
 	if(score === undefined) {
 		/* not actually voting, just skipping this prompt */
 		load_voting_pair();
 		return;
 	}
+
+	let outer = document.createElement('div'), spinner = document.createElement('div'), span = document.createElement('span');
+	spinner.setAttribute('class', 'spinner-border spinner-border');
+	span.setAttribute('class', 'visually-hidden');
+	span.appendChild(document.createTextNode('Loading...'));
+	spinner.appendChild(span);
+	outer.setAttribute('class', 'spinner-outer mt-2 text-center');
+	outer.appendChild(spinner);
+	$("div#vote-feedback").empty().append(outer);
 
 	let cpair = $("div#voting-ui").data('current-pair');
 	cpair.a = 'submit-voting-pair';
@@ -100,10 +107,15 @@ const submit_vote = score => {
 		strong.appendChild(document.createTextNode(operand));
 		alert.appendChild(strong);
 		alert.appendChild(document.createTextNode(' for prompt ' + cpair.pair.prompt_id + '.'));
-		$("div#vote-feedback").empty().append(alert);
+		$("div#vote-feedback").fadeOut(200).promise().done(() => {
+			$("div#vote-feedback").empty().append(alert).fadeIn(200);
+		});
 		load_voting_pair();
 	}, () => {
-		$("div#voting-ui button").prop('disabled', false);
+                setTimeout(() => {
+			$("div#voting-ui button").prop('disabled', false);
+			$("div#vote-feedback > div.spinner-outer").remove();
+		}, 5000);
 	});
 };
 
