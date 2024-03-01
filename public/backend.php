@@ -79,16 +79,28 @@ function hmac($anything): string {
 	return hash_hmac('sha256', json_encode($anything), $config['hmac_secret']);
 }
 
-function get_session_id(): int|false {
-	global $db;
-	$ip = inet_pton($_SERVER['REMOTE_ADDR']);
+function trim_ip(string $ip): string|false {
+	$ip = inet_pton($ip);
 	if($ip === false) return false;
 	/* ipv4: keep entire address (4 bytes) */
 	/* ipv6: keep /48 prefix (6 bytes) */
-	$ip = hmac(substr($ip, 6));
+	return substr($ip, 6);
+}
+
+function get_session_id(): int|false {
+	global $db;
+	$ip = trim_ip($_SERVER['REMOTE_ADDR']);
+	if($ip === false) return false;
+	/* keep 28 bits of entropy from the ip address. it's a good balance
+	 * between false positives and anonymity */
+	$ip = substr(hmac($ip), 0, 7);
 	$ua = $_SERVER['HTTP_USER_AGENT'] ?? false;
 	if($ua === false) return false;
-	$ua = hmac($ua);
+	$ua = substr(hmac([
+		$_SERVER['HTTP_USER_AGENT'] ?? null,
+		$_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? null,
+		$_SERVER['HTTP_DNT'] ?? null,
+	]), 0, 3); /* and 12 bits of entropy from client headers */
 	$sid = $db->querySingle($sql = 'SELECT session_id FROM sessions WHERE ip_addr =\''.$ip.'\' AND user_agent = \''.$ua.'\';');
 	if($sid === false) return false;
 	if($sid !== null) return $sid;
