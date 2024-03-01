@@ -172,10 +172,10 @@ $(() => {
 		(new bootstrap.Modal('#disclaimer-modal', {})).show();
 		disclaimer_shown = true;
 
-                if($("div#model-select span.badge > div.spinner-border").length) {
+		let badge = $("div#model-select").closest("div.accordion-item").find("span.badge");
+                if(badge.find('div.spinner-border').length) {
 			let select = $("div#model-select select");
 			select.on('change', () => {
-				let badge = $("div#model-select span.badge");
 				badge.empty();
 				badge.text(select.children(':selected').length + ' models selected');
 			});
@@ -197,10 +197,10 @@ $(() => {
 
 	$("div#model-select form").on('submit', function(e) {
 		e.preventDefault();
-                $("div#voting-ui button.accordion-button").click();
+                $("div#voting-ui").closest("div.accordion-item").find("button.accordion-button").click();
 	});
 
-	$("div#voting-ui button.accordion-button").on('click', function(e) {
+	$("div#voting-ui").closest("div.accordion-item").find("button.accordion-button").on('click', function(e) {
 		if($("div#voting-ui div.spinner-border").length === 0) return;
 		load_voting_pair();
 	});
