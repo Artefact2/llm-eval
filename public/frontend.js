@@ -48,6 +48,21 @@ const post = (params, success, complete) => {
 	});
 };
 
+const chop_text = (parent, text) => {
+	let chopped = text.split(/(\p{P}|\p{Z})/u), i = 1;
+	console.log(chopped);
+	let span = document.createElement('span');
+	for(let frag of chopped) {
+		span.appendChild(document.createTextNode(frag));
+                if(frag.match(/^(\p{P}|\p{Z})*$/u) === null) {
+			parent.appendChild(span);
+			span = document.createElement('span');
+			span.setAttribute('style', 'animation-delay: ' + (i*30) + 'ms;');
+			i += 1;
+		}
+	}
+};
+
 const load_voting_pair = () => {
 	let selected = $("div#model-select option").filter(':selected');
 	let selected_vals = [];
@@ -58,14 +73,16 @@ const load_voting_pair = () => {
 		a: 'get-voting-pair',
 		models: selected_vals,
 	}, data => {
-		/* XXX: add fancy animations */
-		$("div#voting-ui").data('current-pair', data);
-		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty();
-		$("div#voting-ui-prompt").append(document.createTextNode(data.pair.prompt));
-		$("div#voting-ui-a").append(document.createTextNode(data.pair.answer_a));
-		$("div#voting-ui-b").append(document.createTextNode(data.pair.answer_b));
-		$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
-		setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
+                $("div#voting-ui").data('current-pair', data);
+		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").fadeOut(200).promise().done(() => {
+			$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty().fadeIn(200);
+			$("div#voting-ui-prompt").append(document.createTextNode(data.pair.prompt));
+			chop_text($("div#voting-ui-a")[0], data.pair.answer_a);
+			chop_text($("div#voting-ui-b")[0], data.pair.answer_b);
+			$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
+			setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
+
+		});
 	}, () => {
 		setTimeout(() => { $("button#vote-skip").prop('disabled', false); }, 5000);
 	});
@@ -102,7 +119,7 @@ const submit_vote = score => {
 			operand = cpair.pair.model_name_a + operand + cpair.pair.model_name_b;
 		}
                 let alert = document.createElement('div'), strong = document.createElement('strong');
-		alert.setAttribute('class', 'alert alert-success mt-2');
+		alert.setAttribute('class', 'alert alert-success');
 		alert.appendChild(document.createTextNode('Vote successful! '));
 		strong.appendChild(document.createTextNode(operand));
 		alert.appendChild(strong);

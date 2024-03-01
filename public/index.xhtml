@@ -10,6 +10,10 @@
     <script src="bootstrap.js" defer="defer" />
     <script src="jquery.js" defer="defer" />
     <script src="frontend.js" defer="defer" />
+    <style>
+      div#voting-ui-a > span, div#voting-ui-b > span { animation: typewrite forwards 1ms; opacity: 0; }
+      @keyframes typewrite { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style>
   </head>
   <body style="min-height: 100vh; background-image: url(background-kobold.avif); background-repeat: no-repeat; background-size: 35vmin 35vmin; background-position: bottom right;">
     <div id="disclaimer-modal" class="modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -159,7 +163,9 @@
                   <button id="vote-b" class="btn btn-lg btn-primary" disabled="disabled">Right is better!</button>
                 </div>
               </div>
-              <div class="row" id="vote-feedback" />
+              <div class="row mt-2">
+                <div class="col-12" id="vote-feedback" />
+              </div>
             </div>
           </div>
         </div>
