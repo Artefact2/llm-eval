@@ -48,19 +48,45 @@ const post = (params, success, complete) => {
 	});
 };
 
-const chop_text = (parent, text) => {
-	let chopped = text.split(/(\p{P}|\p{Z})/u), i = 1;
-	console.log(chopped);
-	let span = document.createElement('span');
+const chop_text = (text, delay, delay_inc) => {
+	let dfrag = document.createElement('span');
+	let chopped = text.split(/(\p{P}|\p{Z})/u);
+	let make_span = (delay) => {
+		let span = document.createElement('span');
+		span.setAttribute('class', 'typewrite');
+		span.setAttribute('style', 'animation-delay: ' + delay + 'ms;');
+		return span;
+	};
+        let span = make_span(delay);
+	delay += delay_inc;
 	for(let frag of chopped) {
 		span.appendChild(document.createTextNode(frag));
                 if(frag.match(/^(\p{P}|\p{Z})*$/u) === null) {
-			parent.appendChild(span);
-			span = document.createElement('span');
-			span.setAttribute('style', 'animation-delay: ' + (i*30) + 'ms;');
-			i += 1;
+			dfrag.appendChild(span);
+			span = make_span(delay);
+			delay += delay_inc;
 		}
 	}
+	dfrag.appendChild(span);
+	return [ dfrag, delay ];
+};
+
+const chop_element = (element, delay, delay_inc) => {
+	for(let i = 0; i < element.childNodes.length; ++i) {
+		let ch = element.childNodes[i];
+                if(ch.nodeType === 3) {
+			/* text node */
+			let chopped = chop_text(ch.wholeText, delay, delay_inc);
+			element.replaceChild(chopped[0], ch);
+			delay = chopped[1];
+		} else if(ch.nodeType === 1) {
+			/* element node */
+			ch.classList.add('typewrite');
+			ch.setAttribute('style', 'animation-delay: ' + delay + 'ms;');
+			delay = chop_element(ch, delay, delay_inc);
+		}
+	}
+	return delay;
 };
 
 const load_voting_pair = () => {
@@ -77,10 +103,8 @@ const load_voting_pair = () => {
 		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").fadeOut(200).promise().done(() => {
 			$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty().fadeIn(200);
 			$("div#voting-ui-prompt").html(marked.parse(data.pair.prompt));
-			//chop_text($("div#voting-ui-a")[0], data.pair.answer_a);
-			//chop_text($("div#voting-ui-b")[0], data.pair.answer_b);
-			$("div#voting-ui-a").html(marked.parse(data.pair.answer_a));
-			$("div#voting-ui-b").html(marked.parse(data.pair.answer_b));
+			chop_element($("div#voting-ui-a").html(marked.parse(data.pair.answer_a))[0], 0, 30);
+			chop_element($("div#voting-ui-b").html(marked.parse(data.pair.answer_b))[0], 0, 30);
 			$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
 			setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
 
