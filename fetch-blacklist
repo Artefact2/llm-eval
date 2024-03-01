@@ -1,0 +1,59 @@
+#!/usr/bin/env php
+<?php
+/* Copyright 2024 Romain "Artefact2" Dal Maso <romain.dalmaso@artefact2.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+function is_v6(string $ip): bool {
+	return strpos($ip, ':') !== false;
+}
+
+function process(string $uri, array &$list): void {
+	$f = fopen($uri, 'rb');
+	while($line = fgets($f)) {
+		$line = explode('/', trim($line));
+		if(count($line) === 1) {
+			if(is_v6($line[0])) {
+				$line[] = '128';
+			} else {
+				$line[] = '32';
+			}
+		}
+		list($ip, $mask) = $line;
+		$k = is_v6($ip) ? 'ipv6' : 'ipv4';
+		$ip = inet_pton($ip);
+		if($ip === false) continue;
+		$list[$k][$ip] = (int)$mask;
+	}
+}
+
+$list = [ 'ipv4' => [], 'ipv6' => [] ];
+process('https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt', $list);
+process('https://www.dan.me.uk/torlist/?exit', $list);
+ksort($list['ipv4']);
+ksort($list['ipv6']);
+
+echo '<?php', PHP_EOL;
+echo 'return function(string $ip): bool {';
+echo     'static $list = ', var_export($list, true), ';';
+echo     'static $walk = function(string $ip, int $bits, int $stop, array $list) {';
+echo         'for($i = $bits; $i >= $stop; --$i) {';
+echo             'if($i < $bits) { $byte = intdiv($i, 8); $bit = 7 - $i%8; $ip[$byte]=chr(ord($ip[$byte]) & (~(1<<$bit))); }';
+echo             'if(($list[$ip] ?? -1) === $i) return true;';
+echo         '}';
+echo         'return false;';
+echo     '};';
+echo     'if(strpos($ip, ":") !== false) { return $walk(inet_pton($ip), 128, 128, $list["ipv6"]); }';
+echo     'else { return $walk(inet_pton($ip), 32, 10, $list["ipv4"]); }';
+echo '};', PHP_EOL;
