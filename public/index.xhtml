@@ -6,11 +6,11 @@
     <meta name="robots" content="noindex" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="bootstrap.css" />
-    <link rel="icon" href="favicon.png" />
-    <script src="bootstrap.js" defer="defer" />
-    <script src="jquery.js" defer="defer" />
+    <link rel="icon" href="favicon.avif" />
+    <script src="deps.js" defer="defer" />
     <script src="frontend.js" defer="defer" />
     <style>
+      div#voting-ui-prompt > p:last-child { margin-bottom: 0; }
       div#voting-ui-a > span, div#voting-ui-b > span { animation: typewrite forwards 1ms; opacity: 0; }
       @keyframes typewrite { 0% { opacity: 0; } 100% { opacity: 1; } }
     </style>
@@ -72,7 +72,7 @@
 
     <nav class="navbar navbar-expand-sm bg-body-tertiary">
       <div class="container-fluid">
-        <a class="navbar-brand" href="#play"><img src="favicon.png" style="height: 1.5em; vertical-align: middle; border-radius: 0.5em;" /> llm-eval</a>
+        <a class="navbar-brand" href="#play"><img src="favicon.avif" style="height: 1.5em; vertical-align: middle; border-radius: 0.5em;" /> llm-eval</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -144,13 +144,13 @@
             <div class="accordion-body container">
               <div class="row overflow-y-scroll align-items-top" style="height: calc(100vh - 500px); min-height: max(60vh, min(500px, 80vh));">
                 <div class="col-12">
-                  <div class="alert alert-primary text-center" id="voting-ui-prompt" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                  <div class="alert alert-primary" id="voting-ui-prompt"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
                 <div class="col-6 pe-1">
-                  <div class="alert alert-secondary" id="voting-ui-a" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                  <div class="alert alert-secondary" id="voting-ui-a"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
                 <div class="col-6 pb-1">
-                  <div class="alert alert-secondary" id="voting-ui-b" style="white-space: pre-wrap;"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                  <div class="alert alert-secondary" id="voting-ui-b"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>
                 </div>
               </div>
               <div class="row mt-4">

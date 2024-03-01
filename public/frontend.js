@@ -76,9 +76,11 @@ const load_voting_pair = () => {
                 $("div#voting-ui").data('current-pair', data);
 		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").fadeOut(200).promise().done(() => {
 			$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty().fadeIn(200);
-			$("div#voting-ui-prompt").append(document.createTextNode(data.pair.prompt));
-			chop_text($("div#voting-ui-a")[0], data.pair.answer_a);
-			chop_text($("div#voting-ui-b")[0], data.pair.answer_b);
+			$("div#voting-ui-prompt").html(marked.parse(data.pair.prompt));
+			//chop_text($("div#voting-ui-a")[0], data.pair.answer_a);
+			//chop_text($("div#voting-ui-b")[0], data.pair.answer_b);
+			$("div#voting-ui-a").html(marked.parse(data.pair.answer_a));
+			$("div#voting-ui-b").html(marked.parse(data.pair.answer_b));
 			$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
 			setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
 
@@ -138,6 +140,7 @@ const submit_vote = score => {
 
 $(() => {
 	$('div#javascript-check').remove();
+	marked.use(markedXhtml.markedXhtml());
 
 	let disclaimer_shown = false;
 	$("section#play").on('my-show', () => {
