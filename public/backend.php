@@ -20,7 +20,7 @@ function hmac($anything): string {
 		trigger_error('hmac_secret not long enough (needs at least 32 characters), update your settings.php', \E_USER_ERROR);
 		die(1);
 	}
-	return hash_hmac('sha256', json_encode($anything), $config['hmac_secret']);
+	return hash_hmac('sha256', var_export($anything, true), $config['hmac_secret']);
 }
 
 function get_self_ip(): string|false {
