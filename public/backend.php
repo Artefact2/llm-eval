@@ -30,7 +30,7 @@ function get_self_ip(): string|false {
 	$ip = inet_pton($config['remote_addr']());
 	if($ip === false) return false;
 	/* check for IPv4-mapped IPv6, some proxies use this */
-	if(substr($ip, 0, 12) === substr(inet_pton('::ffff:127.0.0.1'), 0, 12)) {
+	if(substr($ip, 0, 12) === "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF") {
 		$ip = substr($ip, 12);
 	}
 	if(strlen($ip) === 4) {
