@@ -80,5 +80,5 @@ while($row = $prompts->fetchArray()) {
 	}
 	$prompt_id = $row['prompt_id'];
 	$answer = json_decode($ans, true)['content'];
-	$ins_stmt->execute();
+	if($ins_stmt->execute() === false) break;
 }
