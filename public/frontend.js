@@ -99,9 +99,17 @@ const parse_and_sanitize_md = s => {
 			"p", "pre", "section", "span", "strike", "strong", "sub", "summary", "sup", "table",
 			"tbody", "td", "th", "thead", "tr", "u", "ul", "#text",
 		],
-		KEEP_CONTENT: false,
+		KEEP_CONTENT: true,
 	};
-	return DOMPurify.sanitize(marked.parse(s), config);
+	let frag = DOMPurify.sanitize(marked.parse(s), config);
+	if(frag) return frag;
+	/* some prompts/answers have things that *look* like HTML, but are not
+	 * (eg, C++ templates like Foo<Bar>), and this trips up the sanitizer.
+	 * fall back to raw text in this case. */
+	frag = document.createElement('div');
+	frag.setAttribute('style', 'white-space: pre-wrap;');
+	frag.textContent = s;
+	return frag;
 };
 
 const load_voting_pair = () => {
