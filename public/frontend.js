@@ -89,6 +89,21 @@ const chop_element = (element, delay, delay_inc) => {
 	return delay;
 };
 
+const parse_and_sanitize_md = s => {
+	const config = {
+		PARSER_MEDIA_TYPE: 'application/xhtml+xml',
+		RETURN_DOM_FRAGMENT: true,
+		ALLOWED_TAGS: [
+			"a", "article", "b", "blockquote", "br", "caption", "code", "del", "details", "div", "em",
+			"h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd", "li", "main", "ol",
+			"p", "pre", "section", "span", "strike", "strong", "sub", "summary", "sup", "table",
+			"tbody", "td", "th", "thead", "tr", "u", "ul", "#text",
+		],
+		KEEP_CONTENT: false,
+	};
+	return DOMPurify.sanitize(marked.parse(s), config);
+};
+
 const load_voting_pair = () => {
 	let selected = $("div#model-select option").filter(':selected');
 	let selected_vals = [];
@@ -102,9 +117,9 @@ const load_voting_pair = () => {
 		$("div#voting-ui").data('current-pair', data);
 		$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").fadeOut(200).promise().done(() => {
 			$("div#voting-ui-a, div#voting-ui-b, div#voting-ui-prompt").empty().fadeIn(200);
-			$("div#voting-ui-prompt").html(marked.parse(data.pair.prompt));
-			chop_element($("div#voting-ui-a").html(marked.parse(data.pair.answer_a))[0], 0, 30);
-			chop_element($("div#voting-ui-b").html(marked.parse(data.pair.answer_b))[0], 0, 30);
+			$("div#voting-ui-prompt").empty().append(parse_and_sanitize_md(data.pair.prompt));
+			chop_element($("div#voting-ui-a").empty().append(parse_and_sanitize_md(data.pair.answer_a))[0], 0, 30);
+			chop_element($("div#voting-ui-b").empty().append(parse_and_sanitize_md(data.pair.answer_b))[0], 0, 30);
 			$("div#voting-ui div.overflow-y-scroll").scrollTop(0);
 			setTimeout(() => { $("div#voting-ui button").prop('disabled', false); }, 5000);
 
