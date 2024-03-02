@@ -182,28 +182,26 @@ const format_votes_results = (element, s_votes, n_prompts, n_votes) => {
 		/* no data */
 		return;
 	}
-	let f = s_votes / n_prompts;
+	/* 0% = A wins always vs B, 100% = A loses always vs B */
+	let f = (1.0 + s_votes / n_prompts) / 2.0;
 	/* worst case variance: 50% for(-1)/50% against(+1) votes, mean=0 stddev=1 */
 	/* use 3σ for close to 99% CI */
-	let s = 3.0 / Math.sqrt(n_prompts);
-        if(f < s && f > -s) {
-		element.appendChild(document.createTextNode('not significant'));
-                element.classList.add('text-body-tertiary');
-		return;
-	}
-	let p;
-	if(f >= 0) {
-		p = "Lose";
-		element.classList.add('text-danger');
+	let s = 3.0 * 0.5 / Math.sqrt(n_prompts);
+	let significant = (f > 0.5 + s) || (f < 0.5 - s);
+	if(significant) {
+		element.classList.add('fw-bold');
+		if(f >= 0.5) {
+			element.classList.add('text-danger');
+		} else {
+			element.classList.add('text-success');
+		}
 	} else {
-		p = "Win";
-		f = -f;
-		element.classList.add('text-success');
+                element.classList.add('text-body-tertiary');
 	}
+
 	element.appendChild(document.createTextNode(
-		'p(' + p + ')='
-			+ (new Intl.NumberFormat(undefined, {style: "percent"})).format(f)
-			+ '±' + (new Intl.NumberFormat(undefined, {
+                (new Intl.NumberFormat(undefined, {style: "percent"})).format(1.0 - f)
+			+ ' ± ' + (new Intl.NumberFormat(undefined, {
 				style: "percent",
 				maximumFractionDigits: 2,
 				minimumFractionDigits: 2
@@ -214,12 +212,14 @@ const format_votes_results = (element, s_votes, n_prompts, n_votes) => {
 const format_results_table = data => {
 	/* XXX: making a lot of assumptions here wrt model names */
 	let table_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
-	let row_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
-	let col_name = k => 'vs ' + row_name(k);
+	let quant_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
+	let row_name = k => 'prefers ' + quant_name(k);
+	let col_name = k => 'vs ' + quant_name(k);
 	let table = document.createElement('table'), tbody = document.createElement('tbody');
 	table.setAttribute('data-ts', (new Date()).getTime());
 	table.appendChild(tbody);
 	table.classList.add('table');
+	table.classList.add('table-striped');
 	for(let a in data.results) {
 		let thead = document.createElement('thead');
 		let tr = document.createElement('tr');
