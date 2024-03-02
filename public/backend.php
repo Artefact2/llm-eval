@@ -23,26 +23,23 @@ function hmac($anything): string {
 	return hash_hmac('sha256', json_encode($anything), $config['hmac_secret']);
 }
 
-function trim_ip(string $ip): string|false {
-	$ip = inet_pton($ip);
-	if($ip === false) return false;
-	/* ipv4: keep entire address (4 bytes) */
-	/* ipv6: keep /48 prefix (6 bytes) */
-	return substr($ip, 6);
-}
-
 function get_self_ip(): string|false {
 	static $ip = null;
 	if($ip !== null) return $ip;
-	$ip = trim_ip($_SERVER['REMOTE_ADDR']);
+	global $config;
+	$ip = inet_pton($config['remote_addr']());
 	if($ip === false) return false;
-	if(strpos($_SERVER['REMOTE_ADDR'], ':') === false) {
+	/* check for IPv4-mapped IPv6, some proxies use this */
+	if(substr($ip, 0, 12) === substr(inet_pton('::ffff:127.0.0.1'), 0, 12)) {
+		$ip = substr($ip, 12);
+	}
+	if(strlen($ip) === 4) {
 		/* keep 28 bits of entropy for ipv4 addresses. it's a good
 		 * balance between false positives and anonymity */
 		$ip = substr(hmac($ip), 0, 7);
 	} else {
-		/* for ipv6, keep 40 bits */
-		$ip = substr(hmac($ip), 0, 10);
+		/* for ipv6, keep 40 bits of the /48 */
+		$ip = substr(hmac(substr($ip, 0, 6)), 0, 10);
 	}
 	return $ip;
 }

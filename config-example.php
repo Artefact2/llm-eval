@@ -8,6 +8,8 @@ return [
 	/* rate limits: array of [ num_seconds => max_requests, ... ], set to
 	 * empty array [] to disable, keep sorted in descending key order */
 	'rate_limits' => [ 600 => 120, 180 => 60 ],
+	/* returns the IP of the client, if you have a proxy you might want HTTP_X_FORWARDED_FOR here */
+	'remote_addr' => function() { return $_SERVER['REMOTE_ADDR']; },
 	/* if the whitelist returns true, access is allowed and the blacklist is not checked. */
 	'whitelist' => function(string $ip): bool { return false; },
 	/* if the blacklist returns true, access is denied. */
