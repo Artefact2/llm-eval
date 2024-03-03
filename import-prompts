@@ -18,8 +18,9 @@
 require __DIR__.'/common.php';
 
 $json = json_decode(file_get_contents('php://stdin'), true);
+$db = get_db();
 
-if(begin_immediate($db) === false) {
+if($db->exec('BEGIN IMMEDIATE;') === false) {
 	fprintf(STDERR, "%s: could not begin immediate transaction\n", $argv[1]);
 	die(1);
 }

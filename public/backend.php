@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+require realpath(__DIR__).'/../common.php';
+
 function hmac($anything): string {
 	global $config;
 	if(strlen($config['hmac_secret']) < 32) {
@@ -58,7 +60,7 @@ function get_session_id($db, $insert_if_missing = true): int|false|null {
 	if($sid === false) return false;
 	if($sid !== null) return $sid;
 	if($sid === null && $insert_if_missing === false) return null;
-	if(begin_immediate($db) === false) return false;
+	if($db->exec('BEGIN IMMEDIATE;') === false) return false;
 	$sid = $db->querySingle($sql);
 	if($sid === false) return false;
 	if($sid !== null) {
@@ -118,9 +120,6 @@ if($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 
 
-/* get config before importing common, this avoids a db connection for
- * blacklisted clients */
-$config = require realpath(__DIR__).'/../config.php';
 if($config['whitelist']($_SERVER['REMOTE_ADDR']) === false && $config['blacklist']($_SERVER['REMOTE_ADDR']) === true) {
 	$reply = [
 		'status' => 'client-error',
@@ -131,8 +130,9 @@ if($config['whitelist']($_SERVER['REMOTE_ADDR']) === false && $config['blacklist
 
 
 
-require realpath(__DIR__).'/../common.php';
+
 $ip = get_self_ip();
+$db = get_db();
 foreach($config['rate_limits'] as $secs => $reqs) {
 	if($db->querySingle('SELECT COUNT(ip_hash) FROM rate_limit WHERE ip_hash=\''.$ip.'\' AND timestamp > (unixepoch() - '.$secs.');') > $reqs) {
 		$reply = [
@@ -143,7 +143,7 @@ foreach($config['rate_limits'] as $secs => $reqs) {
 	}
 }
 if($config['rate_limits'] !== []) {
-	if(begin_immediate($db) === false) {
+	if($db->exec('BEGIN IMMEDIATE;') === false) {
 		$reply = [
 			'status' => 'server-error',
 			'error' => 'db error'

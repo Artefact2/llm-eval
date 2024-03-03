@@ -43,17 +43,13 @@ function spawn_server(string $model_path): void {
 require __DIR__.'/common.php';
 
 $model = pathinfo($model_path, \PATHINFO_FILENAME);
+$db = get_db();
 
 $pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
 LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
 WHERE answers.prompt_id IS NULL;');
 $pq->bindValue(':model', $model);
 $prompts = $pq->execute();
-
-$ins_stmt = $db->prepare('INSERT INTO answers(prompt_id, model_name, answer) VALUES(:pid, :model, :answer);');
-$ins_stmt->bindValue(':model', $model);
-$ins_stmt->bindParam(':pid', $prompt_id);
-$ins_stmt->bindParam(':answer', $answer);
 
 while($row = $prompts->fetchArray()) {
 	spawn_server($model_path);
@@ -78,7 +74,17 @@ while($row = $prompts->fetchArray()) {
 		var_dump($row);
 		die(1);
 	}
-	$prompt_id = $row['prompt_id'];
 	$answer = json_decode($ans, true)['content'];
+	if(!is_string($answer) || trim($answer) === '') break;
+	/* get a new handle just for writing this answer. sqlite does not like
+	 * long lived connections for writing and often gets stuck in locked
+	 * states */
+	$dbw = get_db();
+	$ins_stmt = $dbw->prepare('INSERT INTO answers(prompt_id, model_name, answer) VALUES(:pid, :model, :answer);');
+	$ins_stmt->bindValue(':model', $model);
+	$ins_stmt->bindValue(':pid', $row['prompt_id']);
+	$ins_stmt->bindValue(':answer', $answer);
 	if($ins_stmt->execute() === false) break;
+	$ins_stmt->close();
+	$dbw->close();
 }
