@@ -44,7 +44,7 @@ function get_self_ip(): string|false {
 	return $ip;
 }
 
-function get_session_id($db): int|false {
+function get_session_id($db, $insert_if_missing = true): int|false|null {
 	$ip = get_self_ip();
 	if($ip === false) return false;
 	$ua = $_SERVER['HTTP_USER_AGENT'] ?? false;
@@ -57,6 +57,7 @@ function get_session_id($db): int|false {
 	$sid = $db->querySingle($sql = 'SELECT session_id FROM sessions WHERE ip_addr =\''.$ip.'\' AND user_agent = \''.$ua.'\';');
 	if($sid === false) return false;
 	if($sid !== null) return $sid;
+	if($sid === null && $insert_if_missing === false) return null;
 	if(begin_immediate($db) === false) return false;
 	$sid = $db->querySingle($sql);
 	if($sid === false) return false;
@@ -269,8 +270,12 @@ if($payload['a'] === 'get-results-global' || $payload['a'] === 'get-results-sess
 	if($payload['a'] === 'get-results-global') {
 		$q = $db->query('SELECT model_name_a, model_name_b, s_votes, n_prompts, n_votes FROM results_agg;');
 	} else {
-		$sid = get_session_id($db);
+		$sid = get_session_id($db, false);
 		if($sid === false) die();
+		if($sid === null) {
+			$reply = [ 'status' => 'ok', 'results' => [] ];
+			die();
+		}
 		$q = $db->query('SELECT model_name_a, model_name_b, s_votes, n_votes AS n_prompts, n_votes FROM results_per_session WHERE session_id='.$sid.';');
 	}
 	while($row = $q->fetchArray(\SQLITE3_ASSOC)) {
