@@ -30,6 +30,15 @@ PRIMARY KEY(session_id)
 
 CREATE INDEX sessions_ip_addr_user_agent ON sessions(ip_addr, user_agent);
 
+CREATE TABLE voted_answers (
+session_id INTEGER NOT NULL,
+prompt_id INTEGER NOT NULL,
+model_name TEXT NOT NULL,
+PRIMARY KEY(session_id, prompt_id, model_name),
+FOREIGN KEY(session_id) REFERENCES sessions(session_id),
+FOREIGN KEY(prompt_id, model_name) REFERENCES answers(prompt_id, model_name)
+) WITHOUT ROWID;
+
 CREATE TABLE votes (
 session_id INTEGER NOT NULL,
 prompt_id INTEGER NOT NULL,
@@ -38,12 +47,11 @@ model_name_b TEXT NOT NULL,
 vote INTEGER NOT NULL,
 timestamp INTEGER NOT NULL,
 PRIMARY KEY(session_id, prompt_id, model_name_a, model_name_b),
-FOREIGN KEY(session_id) REFERENCES sessions(session_id),
-FOREIGN KEY(prompt_id, model_name_a) REFERENCES answers(prompt_id, model_name),
-FOREIGN KEY(prompt_id, model_name_b) REFERENCES answers(prompt_id, model_name),
+FOREIGN KEY(session_id, prompt_id, model_name_a) REFERENCES voted_answers(session_id, prompt_id, model_name),
+FOREIGN KEY(session_id, prompt_id, model_name_b) REFERENCES voted_answers(session_id, prompt_id, model_name),
 CHECK(vote IN(-1, 0, 1)),
 CHECK(model_name_a < model_name_b)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX votes_models_ab_prompt_id ON votes(model_name_a, model_name_b, prompt_id);
 CREATE INDEX votes_models_ab_session_id ON votes(session_id, model_name_a, model_name_b);
@@ -53,10 +61,10 @@ SELECT sessions.session_id, prompts.prompt_id, prompt, a.model_name AS model_nam
 FROM prompts -- for all prompts...
 JOIN sessions -- and all sessions...
 JOIN answers AS a ON a.prompt_id = prompts.prompt_id -- join first answer
-LEFT JOIN votes AS va ON va.session_id = sessions.session_id AND va.prompt_id = prompts.prompt_id AND a.model_name IN(va.model_name_a, va.model_name_b)
+LEFT JOIN voted_answers AS va ON va.session_id = sessions.session_id AND va.prompt_id = prompts.prompt_id AND va.model_name = a.model_name
 JOIN answers AS b ON b.prompt_id = prompts.prompt_id AND a.model_name < b.model_name -- join second answer
-LEFT JOIN votes AS vb ON vb.session_id = sessions.session_id AND vb.prompt_id = prompts.prompt_id AND b.model_name IN(vb.model_name_a, vb.model_name_b)
-WHERE va.session_id IS NULL AND vb.session_id IS NULL; -- anti join already answered models
+LEFT JOIN voted_answers AS vb ON vb.session_id = sessions.session_id AND vb.prompt_id = prompts.prompt_id AND vb.model_name = b.model_name
+WHERE va.session_id IS NULL AND vb.session_id IS NULL; -- anti join already voted on answers
 
 CREATE VIEW results_per_prompt AS
 SELECT model_name_a, model_name_b, prompt_id, AVG(vote) AS avg_vote, COUNT(vote) AS n_votes
