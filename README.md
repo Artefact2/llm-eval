@@ -25,3 +25,15 @@ parallel -n1 -j1 --ungroup ./generate-answers {} '[INST]' '[/INST]' '["[/INST]"]
 make fetch-deps
 make host
 ```
+
+# Updating
+
+```
+git pull
+
+# check for changes in the default configuration file
+git diff master@{1}..master config-example.php
+
+# check for schema updates
+git log --grep='^schema[,:]' --reverse master@{1}..master
+```
