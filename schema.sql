@@ -1,3 +1,5 @@
+PRAGMA journal_mode = WAL;
+
 BEGIN;
 
 CREATE TABLE prompts (

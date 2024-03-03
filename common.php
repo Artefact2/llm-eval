@@ -18,9 +18,8 @@ if(!isset($config)) {
 	$config = require __DIR__.'/config.php';
 }
 
-function get_db() {
-	$db = new \SQLite3(__DIR__.'/db.sqlite', \SQLITE3_OPEN_READWRITE);
-	$db->exec('PRAGMA journal_mode = WAL;');
+function get_db(int $mode = \SQLITE3_OPEN_READWRITE) {
+	$db = new \SQLite3(__DIR__.'/db.sqlite', $mode);
 	$db->exec('PRAGMA busy_timeout = 15000;');
 	$db->exec('PRAGMA foreign_keys = 1;');
 	return $db;
