@@ -185,20 +185,15 @@ const submit_vote = score => {
 	});
 };
 
-const format_votes_results = (element, s_votes, n_prompts, n_votes) => {
-	if(n_votes === 0) {
+const format_votes_results = (element, f, s) => {
+	if(s === 0) {
 		/* no data */
 		return;
 	}
-	/* 0% = A wins always vs B, 100% = A loses always vs B */
-	let f = (1.0 + s_votes / n_prompts) / 2.0;
-	/* worst case variance: 50% for(-1)/50% against(+1) votes, mean=0 stddev=1 */
-	/* use 3σ for close to 99% CI */
-	let s = 3.0 * 0.5 / Math.sqrt(n_prompts);
-	let significant = (f > 0.5 + s) || (f < 0.5 - s);
+        let significant = (f > 0.5 + s) || (f < 0.5 - s);
 	if(significant) {
 		element.classList.add('fw-bold');
-		if(f >= 0.5) {
+		if(f < 0.5) {
 			element.classList.add('text-danger');
 		} else {
 			element.classList.add('text-success');
@@ -208,7 +203,7 @@ const format_votes_results = (element, s_votes, n_prompts, n_votes) => {
 	}
 
 	element.appendChild(document.createTextNode(
-                (new Intl.NumberFormat(undefined, {style: "percent"})).format(1.0 - f)
+                (new Intl.NumberFormat(undefined, {style: "percent"})).format(f)
 			+ ' ± ' + (new Intl.NumberFormat(undefined, {
 				style: "percent",
 				maximumFractionDigits: 2,
@@ -251,7 +246,7 @@ const format_results_table = data => {
 		tbody.appendChild(tr);
 		for(let b in data.results[a]) {
 			let td = document.createElement('td');
-			format_votes_results(td, data.results[a][b][0], data.results[a][b][1], data.results[a][b][2])
+			format_votes_results(td, data.results[a][b][0], data.results[a][b][1]);
 			tr.appendChild(td);
 		}
 	}

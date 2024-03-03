@@ -268,7 +268,7 @@ if($payload['a'] === 'get-results-global' || $payload['a'] === 'get-results-sess
 	$keys = [ 'a' => [], 'b' => [] ];
 	$data = [];
 	if($payload['a'] === 'get-results-global') {
-		$q = $db->query('SELECT model_name_a, model_name_b, s_votes, n_prompts, n_votes FROM results_agg;');
+		$q = $db->query('SELECT model_name_a, model_name_b, win_rate_estimate, win_rate_uncertainty FROM results_agg;');
 	} else {
 		$sid = get_session_id($db, false);
 		if($sid === false) die();
@@ -276,19 +276,19 @@ if($payload['a'] === 'get-results-global' || $payload['a'] === 'get-results-sess
 			$reply = [ 'status' => 'ok', 'results' => [] ];
 			die();
 		}
-		$q = $db->query('SELECT model_name_a, model_name_b, s_votes, n_votes AS n_prompts, n_votes FROM results_per_session WHERE session_id='.$sid.';');
+		$q = $db->query('SELECT model_name_a, model_name_b, win_rate_estimate, win_rate_uncertainty FROM results_per_session WHERE session_id='.$sid.';');
 	}
 	while($row = $q->fetchArray(\SQLITE3_ASSOC)) {
 		$keys['a'][$row['model_name_a']] = true;
 		$keys['b'][$row['model_name_b']] = true;
 		$data[$row['model_name_a']][$row['model_name_b']] = [
-			$row['s_votes'], $row['n_prompts'], $row['n_votes'],
+			$row['win_rate_estimate'], $row['win_rate_uncertainty'],
 		];
 	}
 	foreach($keys['a'] as $a => $x) {
 		foreach($keys['b'] as $b => $x) {
 			if(isset($data[$a][$b])) continue;
-			$data[$a][$b] = [ 0, 0, 0 ];
+			$data[$a][$b] = [ 0, 0 ];
 		}
 	}
 	ksort($data);

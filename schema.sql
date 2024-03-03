@@ -64,12 +64,12 @@ FROM votes
 GROUP BY model_name_a, model_name_b, prompt_id;
 
 CREATE VIEW results_agg AS
-SELECT model_name_a, model_name_b, SUM(avg_vote) AS s_votes, COUNT(avg_vote) AS n_prompts, SUM(n_votes) AS n_votes
+SELECT model_name_a, model_name_b, 1.0-(1.0+AVG(avg_vote))/2.0 AS win_rate_estimate, 1.5/SQRT(COUNT(avg_vote)) AS win_rate_uncertainty
 FROM results_per_prompt
 GROUP BY model_name_a, model_name_b;
 
 CREATE VIEW results_per_session AS
-SELECT model_name_a, model_name_b, session_id, SUM(vote) AS s_votes, COUNT(vote) AS n_votes
+SELECT model_name_a, model_name_b, session_id, 1.0-(1.0+AVG(vote))/2.0 AS win_rate_estimate, 1.5/SQRT(COUNT(vote)) AS win_rate_uncertainty
 FROM votes
 GROUP BY model_name_a, model_name_b, session_id;
 
