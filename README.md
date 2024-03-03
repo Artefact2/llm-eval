@@ -17,10 +17,17 @@ cp config{-example,}.php
 $EDITOR config.php
 
 # prompts.json should be an array of strings
+# (or populate the prompts table on your own)
 ./import-prompts < prompts.json
 
-# args: path to model file, instruct prefix, instruct suffix, json array of stop sequences
-parallel -n1 -j1 --ungroup ./generate-answers {} '[INST]' '[/INST]' '["[/INST]"]' ::: models/*.gguf
+# generate-answer args:
+# - path to model file,
+# - instruct prefix,
+# - instruct suffix,
+# - json array of stop sequences,
+# - comma-separated worker index and worker count
+# (or populate the answers table on your own)
+parallel -n1 -j1 --ungroup ./generate-answers {} '[INST]' '[/INST]' '["[/INST]"]' 10 ::: ./models/*.gguf
 
 make fetch-deps
 make host

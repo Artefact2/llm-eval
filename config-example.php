@@ -4,7 +4,7 @@ return [
 	/* generate one yourself, with eg $(xxd -c 32 -p -l 32 /dev/urandom) */
 	'hmac_secret' => '',
 	/* will be passed to llama.cpp server binary */
-	'server_args' => function(string $model_path): string { return '-ngl 999'; },
+	'server_args' => function(string $model_path): string { return '-cb -np 8 -c 32768 -ngl 999'; },
 	/* rate limits: array of [ num_seconds => max_requests, ... ], set to
 	 * empty array [] to disable, keep sorted in descending key order */
 	'rate_limits' => [ 600 => 120, 180 => 60 ],

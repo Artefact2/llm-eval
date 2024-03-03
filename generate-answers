@@ -15,76 +15,111 @@
  * limitations under the License.
  */
 
-if($argc !== 5) {
-	fprintf(STDERR, "Usage: %s <model.gguf> <instruct-prefix> <instruct-suffix> <stop-sequences>\n", $argv[0]);
-	die(1);
-}
-list(, $model_path, $prefix, $suffix, $stops) = $argv;
-
-function spawn_server(string $model_path): void {
-	static $spawned = false;
-	if($spawned === true) return;
-	$spawned = true;
-	if(pcntl_fork() === 0) {
-		global $config;
-		$server_args = $config['server_args']($model_path);
-		passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -c 4096 -m '.escapeshellarg($model_path).' '.$server_args);
-		die(0);
-	}
-	register_shutdown_function(function() {
-		posix_kill(0, SIGTERM);
-	});
-	do {
-		sleep(2);
-		$status = @json_decode(file_get_contents('http://127.0.0.1:24498/health'), true);
-	} while(($status['status'] ?? "error") !== "ok");
-}
-
 require __DIR__.'/common.php';
 
-$model = pathinfo($model_path, \PATHINFO_FILENAME);
-$db = get_db();
+if($argc < 5 || $argc > 6) {
+	fprintf(STDERR, "Usage: %s <model.gguf> <instruct-prefix> <instruct-suffix> <stop-sequences> [num_workers]\n", $argv[0]);
+	die(1);
+}
+if($argc === 5) $argv[] = "1";
+list(, $model_path, $prefix, $suffix, $stops, $workers) = $argv;
 
-$pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
-LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
-WHERE answers.prompt_id IS NULL;');
-$pq->bindValue(':model', $model);
-$prompts = $pq->execute();
-
-while($row = $prompts->fetchArray()) {
-	spawn_server($model_path);
-	$ctx = stream_context_create([
-		'http' =>  [
-			'method' => 'POST',
-			'timeout' => 300,
-			'header' => 'Content-Type: application/json',
-			'content' => json_encode([
-				'prompt' => $prefix.$row['prompt'].$suffix,
-				'n_predict' => 512,
-				'samplers' => 'min_p',
-				'min_p' => 0.05,
-				'repeat_penalty' => 1.0,
-				'seed' => 42,
-				'stop' => $stops,
-			]),
-		],
-	]);
-	$ans = file_get_contents('http://127.0.0.1:24498/completion', false, $ctx);
-	if($ans === false) {
-		var_dump($row);
-		die(1);
+function spawn_server(string $model_path): int {
+	if(($pid = pcntl_fork()) > 0) {
+		do {
+			sleep(2);
+			$status = @json_decode(file_get_contents('http://127.0.0.1:24498/health'), true);
+		} while(($status['status'] ?? "error") !== "ok");
+		return $pid;
 	}
-	$answer = json_decode($ans, true)['content'];
-	if(!is_string($answer) || trim($answer) === '') break;
+	global $config;
+	$server_args = $config['server_args']($model_path);
+	passthru(escapeshellcmd(__DIR__.'/llama.cpp/server').' --host 127.0.0.1 --port 24498 -m '.escapeshellarg($model_path).' '.$server_args);
+	die(0);
+}
+
+function insert_answer(string $model, int $prompt_id, string $answer, int $retry = 5): bool {
 	/* get a new handle just for writing this answer. sqlite does not like
 	 * long lived connections for writing and often gets stuck in locked
 	 * states */
 	$dbw = get_db();
 	$ins_stmt = $dbw->prepare('INSERT INTO answers(prompt_id, model_name, answer) VALUES(:pid, :model, :answer);');
 	$ins_stmt->bindValue(':model', $model);
-	$ins_stmt->bindValue(':pid', $row['prompt_id']);
+	$ins_stmt->bindValue(':pid', $prompt_id);
 	$ins_stmt->bindValue(':answer', $answer);
-	if($ins_stmt->execute() === false) break;
+	$res = $ins_stmt->execute();
 	$ins_stmt->close();
 	$dbw->close();
+	if($res !== false) return true;
+	if($retry === 0) return false;
+	sleep(1);
+	return insert_answer($model, $prompt_id, $answer, $retry - 1);
 }
+
+function spawn_worker(string $model_name, int $worker_id, int $worker_count, string $prefix, string $suffix, string $stops): int {
+	if(($pid = pcntl_fork()) > 0) return $pid;
+	$db = $db = get_db(\SQLITE3_OPEN_READONLY);
+	$pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
+	LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
+	WHERE MOD(prompts.prompt_id, :n) = :k AND answers.prompt_id IS NULL;');
+	$pq->bindValue(':model', $model_name);
+	$pq->bindValue(':k', $worker_id);
+	$pq->bindValue(':n', $worker_count);
+	$prompts = $pq->execute();
+	while($row = $prompts->fetchArray()) {
+		printf("\e[1m\e[33mworker %d: generating prompt_id %d\e[0m\n", $worker_id, $row['prompt_id']);
+		$ctx = stream_context_create([
+			'http' =>  [
+				'method' => 'POST',
+				'timeout' => 300,
+				'header' => 'Content-Type: application/json',
+				'content' => json_encode([
+					'prompt' => $prefix.$row['prompt'].$suffix,
+					'n_predict' => 512,
+					'samplers' => 'min_p',
+					'min_p' => 0.05,
+					'repeat_penalty' => 1.0,
+					'seed' => 42,
+					'stop' => $stops,
+				]),
+			],
+		]);
+		$ans = file_get_contents('http://127.0.0.1:24498/completion', false, $ctx);
+		if($ans === false) {
+			var_dump($row);
+			die(1);
+		}
+		$answer = json_decode($ans, true)['content'];
+		if(!is_string($answer) || trim($answer) === '') break;
+		if(insert_answer($model_name, $row['prompt_id'], $answer) === false) break;
+	}
+	die(0);
+}
+
+$model = pathinfo($model_path, \PATHINFO_FILENAME);
+$db = get_db(\SQLITE3_OPEN_READONLY);
+$todo = $db->prepare('SELECT count(*) FROM prompts
+LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
+WHERE answers.prompt_id IS NULL');
+$todo->bindValue(':model', $model);
+if($todo->execute()->fetchArray()[0] === 0) {
+	/* don't spawn the server for nothing */
+	die(0);
+}
+unset($todo, $db);
+
+$server_pid = spawn_server($model_path);
+$worker_pids = [];
+for($i = 0; $i < $workers; ++$i) {
+	$worker_pids[] = spawn_worker($model, $i, $workers, $prefix, $suffix, $stops);
+}
+
+register_shutdown_function(function() { posix_kill(0, SIGKILL); });
+pcntl_signal(SIGTERM, function() { die(0); });
+pcntl_signal(SIGINT, function() { die(0); });
+
+foreach($worker_pids as $p) {
+	pcntl_waitpid($p, $status);
+}
+posix_kill($server_pid, SIGTERM);
+pcntl_waitpid($server_pid, $status);
