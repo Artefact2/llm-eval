@@ -94,7 +94,7 @@ $reply = [
 	'error' => 'backend did not generate a reply',
 ];
 
-register_shutdown_function(function() use(&$reply) {
+register_shutdown_function(function() use(&$reply, &$db) {
 	switch($reply['status'] ?? 'server-error') {
 	case 'ok':
 		break;
@@ -106,6 +106,11 @@ register_shutdown_function(function() use(&$reply) {
 	}
 
 	echo json_encode($reply);
+
+	if($db ?? false) {
+		$db->exec('PRAGMA analysis_limit=1000;');
+		$db->exec('PRAGMA optimize;');
+	}
 });
 
 
