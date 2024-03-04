@@ -272,11 +272,11 @@ $(() => {
 			});
 			post({ a: 'models' }, data => {
 				select.empty();
-				for(let model of data.models) {
-					let optn = $(document.createElement('option'));
-					optn.attr('value', model);
-					optn.attr('selected', 'selected');
-					optn.append(document.createTextNode(model));
+                                for(let model_id in data.models) {
+					let optn = document.createElement('option');
+					optn.setAttribute('value', model_id);
+					optn.setAttribute('selected', 'selected');
+					optn.textContent = data.models[model_id];
 					select.append(optn);
 				}
 				select.prop('disabled', false);

@@ -38,13 +38,13 @@ function spawn_server(string $model_path): int {
 	die(0);
 }
 
-function insert_answer(string $model, int $prompt_id, string $answer, int $retry = 5): bool {
+function insert_answer(int $model_id, int $prompt_id, string $answer, int $retry = 5): bool {
 	/* get a new handle just for writing this answer. sqlite does not like
 	 * long lived connections for writing and often gets stuck in locked
 	 * states */
 	$dbw = get_db();
-	$ins_stmt = $dbw->prepare('INSERT INTO answers(prompt_id, model_name, answer) VALUES(:pid, :model, :answer);');
-	$ins_stmt->bindValue(':model', $model);
+	$ins_stmt = $dbw->prepare('INSERT INTO answers(prompt_id, model_id, answer) VALUES(:pid, :model, :answer);');
+	$ins_stmt->bindValue(':model', $model_id);
 	$ins_stmt->bindValue(':pid', $prompt_id);
 	$ins_stmt->bindValue(':answer', $answer);
 	$res = $ins_stmt->execute();
@@ -56,13 +56,13 @@ function insert_answer(string $model, int $prompt_id, string $answer, int $retry
 	return insert_answer($model, $prompt_id, $answer, $retry - 1);
 }
 
-function spawn_worker(string $model_name, int $worker_id, int $worker_count, string $prefix, string $suffix, string $stops): int {
+function spawn_worker(int $model_id, int $worker_id, int $worker_count, string $prefix, string $suffix, string $stops): int {
 	if(($pid = pcntl_fork()) > 0) return $pid;
 	$db = $db = get_db(\SQLITE3_OPEN_READONLY);
 	$pq = $db->prepare('SELECT prompts.prompt_id, prompt FROM prompts
-	LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
+	LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_id = :model
 	WHERE MOD(prompts.prompt_id, :n) = :k AND answers.prompt_id IS NULL;');
-	$pq->bindValue(':model', $model_name);
+	$pq->bindValue(':model', $model_id);
 	$pq->bindValue(':k', $worker_id);
 	$pq->bindValue(':n', $worker_count);
 	$prompts = $pq->execute();
@@ -91,27 +91,42 @@ function spawn_worker(string $model_name, int $worker_id, int $worker_count, str
 		}
 		$answer = json_decode($ans, true)['content'];
 		if(!is_string($answer) || trim($answer) === '') break;
-		if(insert_answer($model_name, $row['prompt_id'], $answer) === false) break;
+		if(insert_answer($model_id, $row['prompt_id'], $answer) === false) break;
 	}
 	die(0);
 }
 
 $model = pathinfo($model_path, \PATHINFO_FILENAME);
-$db = get_db(\SQLITE3_OPEN_READONLY);
+$db = get_db();
+if($db->exec('BEGIN;') === false) die(1);
+$mq = $db->prepare('SELECT model_id FROM models WHERE model_name = :model;');
+$mq->bindValue(':model', $model);
+if(($mq = $mq->execute()) === false) die(1);
+if($mq = $mq->fetchArray()) {
+	$model_id = $mq[0];
+} else {
+	$mq = $db->prepare('INSERT INTO models(model_name) VALUES(:model);');
+	$mq->bindValue(':model', $model);
+	if($mq->execute() === false) die(1);
+	$model_id = $db->lastInsertRowID();
+}
+if($db->exec('COMMIT;') === false) die(1);
+
+
 $todo = $db->prepare('SELECT count(*) FROM prompts
-LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_name = :model
+LEFT JOIN answers ON answers.prompt_id = prompts.prompt_id AND answers.model_id = :mid
 WHERE answers.prompt_id IS NULL');
-$todo->bindValue(':model', $model);
+$todo->bindValue(':mid', $model_id);
 if($todo->execute()->fetchArray()[0] === 0) {
 	/* don't spawn the server for nothing */
 	die(0);
 }
-unset($todo, $db);
+unset($mq, $todo, $db);
 
 $server_pid = spawn_server($model_path);
 $worker_pids = [];
 for($i = 0; $i < $workers; ++$i) {
-	$worker_pids[] = spawn_worker($model, $i, $workers, $prefix, $suffix, $stops);
+	$worker_pids[] = spawn_worker($model_id, $i, $workers, $prefix, $suffix, $stops);
 }
 
 register_shutdown_function(function() { posix_kill(0, SIGKILL); });

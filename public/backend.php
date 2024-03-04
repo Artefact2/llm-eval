@@ -79,9 +79,9 @@ function get_session_id($db, $insert_if_missing = true): int|false|null {
 	return false;
 }
 
-function should_swap(int $sid, int $pid, string $mna, string $mnb): bool {
+function should_swap(int $sid, int $pid, int $model_id_a, int $model_id_b): bool {
 	/* deterministically returns true about 50% of the time */
-	return preg_match('/^[0-7]/', hmac([ $sid, $pid, $mna, $mnb ]));
+	return preg_match('/^[0-7]/', hmac([ $sid, $pid, $model_id_a, $model_id_b ]));
 }
 
 
@@ -170,7 +170,7 @@ if(!is_array($payload) || !isset($payload['a'])) {
 
 
 if($payload['a'] === 'models') {
-	$q = $db->query('SELECT model_name FROM models ORDER BY model_name ASC;');
+	$q = $db->query('SELECT model_id, model_name FROM models ORDER BY model_name ASC;');
 	if($q === false) {
 		$reply = [
 			'status' => 'server-error',
@@ -183,7 +183,7 @@ if($payload['a'] === 'models') {
 		'models' => [],
 	];
 	while($m = $q->fetchArray(\SQLITE3_NUM)) {
-		$reply['models'][] = $m[0];
+		$reply['models'][$m[0]] = $m[1];
 	}
 	die();
 }
@@ -202,9 +202,9 @@ if($payload['a'] === 'get-voting-pair') {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
 	}
-	$p = $db->prepare('SELECT session_id, prompt_id, model_name_a, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_name_a IN (SELECT value FROM json_each(:models)) AND model_name_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
+	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_name_a, model_id_b, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
 	$p->bindValue(':sid', $sid);
-	$p->bindValue(':models', json_encode($models));
+	$p->bindValue(':models', json_encode(array_map('intval', $models)));
 	$p->bindValue(':p', $prune = (1<<$config['prune_voting_pairs']));
 	$p->bindValue(':q', rand() & ($prune-1));
 	$pair = $p->execute()->fetchArray(\SQLITE3_ASSOC);
@@ -213,7 +213,7 @@ if($payload['a'] === 'get-voting-pair') {
 		die();
 	}
 
-	if(should_swap($pair['session_id'], $pair['prompt_id'], $pair['model_name_a'], $pair['model_name_b'])) {
+	if(should_swap($pair['session_id'], $pair['prompt_id'], $pair['model_id_a'], $pair['model_id_b'])) {
 		$old = $pair['answer_a'];
 		$pair['answer_a'] = $pair['answer_b'];
 		$pair['answer_b'] = $old;
@@ -249,28 +249,28 @@ if($payload['a'] === 'submit-voting-pair') {
 	if(isset($payload['vote']) && ($swap = should_swap(
 		$payload['pair']['session_id'],
 		$payload['pair']['prompt_id'],
-		$payload['pair']['model_name_a'],
-		$payload['pair']['model_name_b']))) {
+		$payload['pair']['model_id_a'],
+		$payload['pair']['model_id_b']))) {
 		$payload['vote'] = -$payload['vote'];
 	}
 	if($db->exec('BEGIN IMMEDIATE;') === false) {
 		$reply = [ 'status' => 'server-error', 'error' => 'db error' ];
 		die();
 	}
-	$stmt = $db->prepare('INSERT INTO voted_answers(session_id, prompt_id, model_name) VALUES(:sid, :pid, :mna), (:sid, :pid, :mnb);');
+	$stmt = $db->prepare('INSERT INTO voted_answers(session_id, prompt_id, model_id) VALUES(:sid, :pid, :ma), (:sid, :pid, :mb);');
 	$stmt->bindValue(':sid', $payload['pair']['session_id']);
 	$stmt->bindValue(':pid', $payload['pair']['prompt_id']);
-	$stmt->bindValue(':mna', $payload['pair']['model_name_a']);
-	$stmt->bindValue(':mnb', $payload['pair']['model_name_b']);
+	$stmt->bindValue(':ma', $payload['pair']['model_id_a']);
+	$stmt->bindValue(':mb', $payload['pair']['model_id_b']);
 	if($stmt->execute() === false) {
 		$reply = [ 'status' => 'server-error', 'error' => 'db error' ];
 		die();
 	}
-	$stmt = $db->prepare('INSERT INTO votes(session_id, prompt_id, model_name_a, model_name_b, vote, timestamp) VALUES(:sid, :pid, :mna, :mnb, :vote, :ts);');
+	$stmt = $db->prepare('INSERT INTO votes(session_id, prompt_id, model_id_a, model_id_b, vote, timestamp) VALUES(:sid, :pid, :ma, :mb, :vote, :ts);');
 	$stmt->bindValue(':sid', $payload['pair']['session_id']);
 	$stmt->bindValue(':pid', $payload['pair']['prompt_id']);
-	$stmt->bindValue(':mna', $payload['pair']['model_name_a']);
-	$stmt->bindValue(':mnb', $payload['pair']['model_name_b']);
+	$stmt->bindValue(':ma', $payload['pair']['model_id_a']);
+	$stmt->bindValue(':mb', $payload['pair']['model_id_b']);
 	$stmt->bindValue(':vote', $payload['vote']);
 	$stmt->bindValue(':ts', time());
 	if($stmt->execute() === false || $db->exec('COMMIT;') === false) {
