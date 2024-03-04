@@ -202,9 +202,11 @@ if($payload['a'] === 'get-voting-pair') {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
 	}
-	$p = $db->prepare('SELECT session_id, prompt_id, model_name_a, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_name_a IN (SELECT value FROM json_each(:models)) AND model_name_b IN (SELECT value FROM json_each(:models)) ORDER BY random() LIMIT 1;');
+	$p = $db->prepare('SELECT session_id, prompt_id, model_name_a, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_name_a IN (SELECT value FROM json_each(:models)) AND model_name_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
 	$p->bindValue(':sid', $sid);
 	$p->bindValue(':models', json_encode($models));
+	$p->bindValue(':p', $prune = (1<<$config['prune_voting_pairs']));
+	$p->bindValue(':q', rand() & ($prune-1));
 	$pair = $p->execute()->fetchArray(\SQLITE3_ASSOC);
 	if(!isset($pair['prompt_id'])) {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to fetch a voting pair' ];

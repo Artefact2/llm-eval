@@ -3,6 +3,8 @@
 return [
 	/* generate one yourself, with eg $(xxd -c 32 -p -l 32 /dev/urandom) */
 	'hmac_secret' => '',
+	/* if you have lots of prompts, increase this to 1,2,3... etc to reduce the number of voting pairs */
+	'prune_voting_pairs' => 0,
 	/* will be passed to llama.cpp server binary */
 	'server_args' => function(string $model_path): string { return '-cb -np 8 -c 32768 -ngl 999'; },
 	/* rate limits: array of [ num_seconds => max_requests, ... ], set to
