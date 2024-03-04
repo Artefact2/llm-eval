@@ -239,6 +239,13 @@ if($payload['a'] === 'submit-voting-pair') {
 		];
 		die();
 	}
+	if(get_session_id($db, false) !== $payload['pair']['session_id']) {
+		$reply = [
+			'status' => 'client-error',
+			'error' => 'session_id mismatch',
+		];
+		die();
+	}
 	if(isset($payload['vote']) && ($swap = should_swap(
 		$payload['pair']['session_id'],
 		$payload['pair']['prompt_id'],
@@ -246,8 +253,19 @@ if($payload['a'] === 'submit-voting-pair') {
 		$payload['pair']['model_name_b']))) {
 		$payload['vote'] = -$payload['vote'];
 	}
-	/* XXX: implement rate limiting */
-	/* let the db constraint check for vote in [-1,0,1] */
+	if($db->exec('BEGIN IMMEDIATE;') === false) {
+		$reply = [ 'status' => 'server-error', 'error' => 'db error' ];
+		die();
+	}
+	$stmt = $db->prepare('INSERT INTO voted_answers(session_id, prompt_id, model_name) VALUES(:sid, :pid, :mna), (:sid, :pid, :mnb);');
+	$stmt->bindValue(':sid', $payload['pair']['session_id']);
+	$stmt->bindValue(':pid', $payload['pair']['prompt_id']);
+	$stmt->bindValue(':mna', $payload['pair']['model_name_a']);
+	$stmt->bindValue(':mnb', $payload['pair']['model_name_b']);
+	if($stmt->execute() === false) {
+		$reply = [ 'status' => 'server-error', 'error' => 'db error' ];
+		die();
+	}
 	$stmt = $db->prepare('INSERT INTO votes(session_id, prompt_id, model_name_a, model_name_b, vote, timestamp) VALUES(:sid, :pid, :mna, :mnb, :vote, :ts);');
 	$stmt->bindValue(':sid', $payload['pair']['session_id']);
 	$stmt->bindValue(':pid', $payload['pair']['prompt_id']);
@@ -255,11 +273,8 @@ if($payload['a'] === 'submit-voting-pair') {
 	$stmt->bindValue(':mnb', $payload['pair']['model_name_b']);
 	$stmt->bindValue(':vote', $payload['vote']);
 	$stmt->bindValue(':ts', time());
-	if($stmt->execute() === false) {
-		$reply = [
-			'status' => 'server-error',
-			'error' => 'db failure',
-		];
+	if($stmt->execute() === false || $db->exec('COMMIT;') === false) {
+		$reply = [ 'status' => 'server-error', 'error' => 'db error' ];
 		die();
 	}
 	$reply = [ 'status' => 'ok', 'swap' => $swap ];
