@@ -207,7 +207,7 @@ if($payload['a'] === 'get-voting-pair') {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
 	}
-	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_name_a, model_id_b, model_name_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
+	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_id_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
 	$p->bindValue(':sid', $sid);
 	$p->bindValue(':models', json_encode(array_map('intval', $models)));
 	$p->bindValue(':p', $prune = (1<<$config['prune_voting_pairs']));
@@ -287,10 +287,10 @@ if($payload['a'] === 'submit-voting-pair') {
 }
 
 if($payload['a'] === 'get-results-global' || $payload['a'] === 'get-results-session') {
-	$keys = [ 'a' => [], 'b' => [] ];
+	$keys = [];
 	$data = [];
 	if($payload['a'] === 'get-results-global') {
-		$q = $db->query('SELECT model_name_a, model_name_b, win_rate_estimate, win_rate_uncertainty FROM results_agg;');
+		$q = $db->query('SELECT model_id_a, model_id_b, s_votes, n_votes FROM results_agg;');
 	} else {
 		$sid = get_session_id($db, false);
 		if($sid === false) die();
@@ -298,23 +298,26 @@ if($payload['a'] === 'get-results-global' || $payload['a'] === 'get-results-sess
 			$reply = [ 'status' => 'ok', 'results' => [] ];
 			die();
 		}
-		$q = $db->query('SELECT model_name_a, model_name_b, win_rate_estimate, win_rate_uncertainty FROM results_per_session WHERE session_id='.$sid.';');
+		$q = $db->query('SELECT model_id_a, model_id_b, s_votes, n_votes FROM results_per_session WHERE session_id='.$sid.';');
 	}
 	while($row = $q->fetchArray(\SQLITE3_ASSOC)) {
-		$keys['a'][$row['model_name_a']] = true;
-		$keys['b'][$row['model_name_b']] = true;
-		$data[$row['model_name_a']][$row['model_name_b']] = [
-			$row['win_rate_estimate'], $row['win_rate_uncertainty'],
+		$keys[$row['model_id_a']] = true;
+		$keys[$row['model_id_b']] = true;
+		$data[$row['model_id_a']][$row['model_id_b']] = [
+			$row['s_votes'], $row['n_votes'],
+		];
+		$data[$row['model_id_b']][$row['model_id_a']] = [
+			-$row['s_votes'], $row['n_votes'],
 		];
 	}
-	foreach($keys['a'] as $a => $x) {
-		foreach($keys['b'] as $b => $x) {
+	foreach($keys as $a => $x) {
+		foreach($keys as $b => $x) {
 			if(isset($data[$a][$b])) continue;
 			$data[$a][$b] = [ 0, 0 ];
 		}
+		ksort($data[$a]);
 	}
 	ksort($data);
-	foreach($data as &$v) ksort($v);
 	$reply = [
 		'status' => 'ok',
 		'results' => $data,

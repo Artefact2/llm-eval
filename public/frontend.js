@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+let models = {};
+
 const error_alert = message => {
 	let div = $(document.createElement('div'));
 	div.addClass('alert alert-danger alert-dismissible fade show mb-0');
@@ -158,14 +160,14 @@ const submit_vote = score => {
 	cpair.a = 'submit-voting-pair';
 	cpair.vote = score;
 	post(cpair, data => {
-		let operand;
+		let operand, mna = models[cpair.pair.model_id_a], mnb = models[cpair.pair.model_id_b];
 		if(cpair.vote === -1)     operand = ' > ';
 		else if(cpair.vote === 0) operand = ' = ';
 		else                      operand = ' < ';
 		if(data.swap) {
-			operand = cpair.pair.model_name_b + operand + cpair.pair.model_name_a;
+			operand = mnb + operand + mna;
 		} else {
-			operand = cpair.pair.model_name_a + operand + cpair.pair.model_name_b;
+			operand = mna + operand + mnb;
 		}
 		let alert = document.createElement('div'), strong = document.createElement('strong');
 		alert.setAttribute('class', 'alert alert-success');
@@ -185,11 +187,16 @@ const submit_vote = score => {
 	});
 };
 
-const format_votes_results = (element, f, s) => {
-	if(s === 0) {
+const format_votes_results = (element, s_votes, n_votes) => {
+	if(n_votes === 0) {
 		/* no data */
 		return;
 	}
+
+	/* get a win frequency in [0;1] */
+	let f = 1.0 - (s_votes/n_votes + 1.0) / 2.0;
+	/* 99% lower bound, https://en.wikipedia.org/wiki/Standard_normal_table */
+	let s = 2.33 * 0.5/Math.sqrt(n_votes);
 
 	let cont = document.createElement('div'), row = document.createElement('div');
         cont.appendChild(row);
@@ -241,46 +248,99 @@ const format_votes_results = (element, f, s) => {
 	}
 };
 
-const format_results_table = data => {
+const format_results = (element, data) => {
+	let heading = document.createElement('h5');
+	element.appendChild(heading);
+	heading.textContent = 'Pairwise preference rate (lower bound, 99% confidence)';
+
 	/* XXX: making a lot of assumptions here wrt model names */
 	let table_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
 	let quant_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
 	let row_name = k => 'prefers ' + quant_name(k);
 	let col_name = k => 'vs ' + quant_name(k);
-	let table = document.createElement('table'), tbody = document.createElement('tbody');
+	let table = document.createElement('table');
+	element.appendChild(table);
 	table.setAttribute('data-ts', (new Date()).getTime());
-	table.appendChild(tbody);
-	table.classList.add('table');
+        table.classList.add('table');
 	table.classList.add('table-striped');
-	for(let a in data.results) {
-		let thead = document.createElement('thead');
+
+	let thead = document.createElement('thead');
+	table.appendChild(thead);
+        for(let a in data.results) {
 		let tr = document.createElement('tr');
 		let th = document.createElement('th');
-		th.append(document.createTextNode(table_name(a)));
+		th.append(document.createTextNode(table_name(models[a])));
 		tr.appendChild(th);
-		table.appendChild(thead);
 		thead.appendChild(tr);
 		for(let b in data.results[a]) {
 			let th = document.createElement('th');
-			th.appendChild(document.createTextNode(col_name(b)));
+			th.appendChild(document.createTextNode(col_name(models[b])));
 			tr.appendChild(th);
 		}
 		break;
 	}
+
+	let tbody = document.createElement('tbody');
+	table.appendChild(tbody);
 	for(let a in data.results) {
 		let tr = document.createElement('tr');
 		let th = document.createElement('th');
-		th.append(document.createTextNode(row_name(a)));
+		th.append(document.createTextNode(row_name(models[a])));
 		tr.appendChild(th);
 		tbody.appendChild(tr);
 		for(let b in data.results[a]) {
 			let td = document.createElement('td');
-			format_votes_results(td, data.results[a][b][0], data.results[a][b][1]);
+			if(a > b) {
+				format_votes_results(
+					td,
+					data.results[a][b][0],
+					data.results[a][b][1]
+				);
+			}
 			tr.appendChild(td);
 		}
 	}
-	return table;
+	$(thead).find('tr > th:last-child').remove();
+        $(tbody).find('tr:first-child, tr > td:last-child').remove();
 };
+
+const show_section = (section_id, delay) => {
+	if(delay === undefined) delay = 250;
+	$("body > section").fadeOut(delay).promise().done(() => {
+		$(document.getElementById(section_id))
+			.removeClass('d-none')
+			.hide()
+			.trigger('my-show')
+			.fadeIn(delay);
+		$("body > nav.navbar a.active").removeClass('active');
+		$("body > nav.navbar a[href='#" + section_id + "']").addClass('active');
+	});
+};
+
+const maybe_refresh_results = a => {
+	let div = $("div#results-" + a);
+	let table = div.find('table');
+	if(table.length && ((new Date()).getTime() - parseInt(table.data('ts'))) < 10000) return;
+	let ch = div.children('div.accordion-body');
+	ch.fadeOut(200).promise().done(() => {
+		ch.empty();
+		let spinner = document.createElement('div'), span = document.createElement('span');
+		spinner.setAttribute('class', 'spinner-border');
+		spinner.appendChild(span);
+		span.setAttribute('class', 'visually-hidden');
+		span.appendChild(document.createTextNode('Loading...'));
+		ch.empty().append(spinner);
+		ch.fadeIn(200);
+		post({ a: 'get-results-' + a }, data => {
+			ch.fadeOut(200).promise().done(() => {
+				format_results(ch.empty()[0], data);
+				ch.fadeIn(200);
+			});
+		});
+	});
+};
+
+
 
 $(() => {
 	$('div#javascript-check').remove();
@@ -299,19 +359,17 @@ $(() => {
 				badge.empty();
 				badge.text(select.children(':selected').length + ' models selected');
 			});
-			post({ a: 'models' }, data => {
-				select.empty();
-                                for(let model_id in data.models) {
-					let optn = document.createElement('option');
-					optn.setAttribute('value', model_id);
-					optn.setAttribute('selected', 'selected');
-					optn.textContent = data.models[model_id];
-					select.append(optn);
-				}
-				select.prop('disabled', false);
-				select.trigger('change');
-				select.next('button').prop('disabled', false);
-			});
+			select.empty();
+			for(let model_id in models) {
+				let optn = document.createElement('option');
+				optn.setAttribute('value', model_id);
+				optn.setAttribute('selected', 'selected');
+				optn.textContent = models[model_id];
+				select.append(optn);
+			}
+			select.prop('disabled', false);
+			select.trigger('change');
+			select.next('button').prop('disabled', false);
 		}
 	});
 
@@ -333,28 +391,7 @@ $(() => {
 		if($("section#results div.collapse.show").length) return;
 		$("div#results-global").prev().find('button').click();
 	});
-	const maybe_refresh_results = a => {
-		let div = $("div#results-" + a);
-		let table = div.find('table');
-		if(table.length && ((new Date()).getTime() - parseInt(table.data('ts'))) < 10000) return;
-		let ch = div.children('div.accordion-body');
-		ch.fadeOut(200).promise().done(() => {
-			ch.empty();
-			let spinner = document.createElement('div'), span = document.createElement('span');
-			spinner.setAttribute('class', 'spinner-border');
-			spinner.appendChild(span);
-			span.setAttribute('class', 'visually-hidden');
-			span.appendChild(document.createTextNode('Loading...'));
-			ch.empty().append(spinner);
-			ch.fadeIn(200);
-			post({ a: 'get-results-' + a }, data => {
-				ch.fadeOut(200).promise().done(() => {
-					ch.empty().append(format_results_table(data));
-					ch.fadeIn(200);
-				});
-			});
-		});
-	};
+
 	for(let a of [ "global", "session" ]) {
 		(a => {
 			let div = $("div#results-" + a);
@@ -365,25 +402,16 @@ $(() => {
 		})(a);
 	}
 
-	const show_section = (section_id, delay) => {
-		if(delay === undefined) delay = 250;
-		$("body > section").fadeOut(delay).promise().done(() => {
-			$(document.getElementById(section_id))
-				.removeClass('d-none')
-				.hide()
-				.trigger('my-show')
-				.fadeIn(delay);
-			$("body > nav.navbar a.active").removeClass('active');
-			$("body > nav.navbar a[href='#" + section_id + "']").addClass('active');
-		});
-	};
+	post({ a: 'models' }, data => {
+		models = data.models;
 
-	addEventListener("hashchange", e => {
-		show_section(window.location.hash.substring(1));
+		addEventListener("hashchange", e => {
+			show_section(window.location.hash.substring(1));
+		});
+		if(window.location.hash.length > 1) {
+			show_section(window.location.hash.substring(1), 0);
+		} else {
+			window.location.hash = "#play";
+		}
 	});
-	if(window.location.hash.length > 1) {
-		show_section(window.location.hash.substring(1), 0);
-	} else {
-		window.location.hash = "#play";
-	}
 });
