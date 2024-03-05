@@ -190,26 +190,55 @@ const format_votes_results = (element, f, s) => {
 		/* no data */
 		return;
 	}
-        let significant = (f > 0.5 + s) || (f < 0.5 - s);
-	if(significant) {
-		element.classList.add('fw-bold');
-		if(f < 0.5) {
-			element.classList.add('text-danger');
-		} else {
-			element.classList.add('text-success');
-		}
-	} else {
-                element.classList.add('text-body-tertiary');
-	}
 
-	element.appendChild(document.createTextNode(
-                (new Intl.NumberFormat(undefined, {style: "percent"})).format(f)
-			+ ' ± ' + (new Intl.NumberFormat(undefined, {
-				style: "percent",
-				maximumFractionDigits: 2,
-				minimumFractionDigits: 2
-			}).format(s))
-	));
+	let cont = document.createElement('div'), row = document.createElement('div');
+        cont.appendChild(row);
+	element.appendChild(cont);
+	cont.setAttribute('class', 'container-fluid');
+	row.setAttribute('class', 'row');
+	let pbar = document.createElement('div');
+	element.appendChild(pbar);
+	pbar.setAttribute('class', 'progress');
+	pbar.setAttribute('style', 'height: 2px;');
+
+        let col = document.createElement('div');
+	row.appendChild(col);
+	col.classList.add('col-6');
+        col.classList.add('ps-0');
+	col.classList.add('text-start');
+	if(f-s > 0.005) {
+		col.textContent = (new Intl.NumberFormat(undefined, {style: "percent"})).format(f-s);
+		col.classList.add('text-success');
+		if(f-s > 0.5) col.classList.add('fw-bold');
+		let pbe = document.createElement('div');
+		pbar.appendChild(pbe);
+		pbe.setAttribute('class', 'progress-bar bg-success');
+		pbe.setAttribute('style', 'width: ' + (100.0 * (f-s)).toFixed(2) + '%;');
+	} else {
+		col.textContent = '0%';
+		col.classList.add('text-body-tertiary');
+	}
+	let pbe = document.createElement('div');
+	pbar.appendChild(pbe);
+	pbe.setAttribute('class', 'progress-bar bg-dark');
+	pbe.setAttribute('style', 'width: ' + (100.0 * (1 - Math.max(0.0, f-s) - Math.max(0.0, 1-f-s))).toFixed(2) + '%;');
+	col = document.createElement('div');
+	row.appendChild(col);
+	col.classList.add('col-6');
+	col.classList.add('pe-0');
+	col.classList.add('text-end');
+	if(f+s < .995) {
+		col.textContent = (new Intl.NumberFormat(undefined, {style: "percent"})).format(1-f-s);
+		col.classList.add('text-danger');
+		if(f+s < 0.5) col.classList.add('fw-bold');
+		let pbe = document.createElement('div');
+		pbar.appendChild(pbe);
+		pbe.setAttribute('class', 'progress-bar bg-danger');
+		pbe.setAttribute('style', 'width: ' + (100.0 * (1-f-s)).toFixed(2) + '%;');
+	} else {
+		col.textContent = '0%';
+		col.classList.add('text-body-tertiary');
+	}
 };
 
 const format_results_table = data => {
