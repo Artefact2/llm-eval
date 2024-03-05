@@ -187,7 +187,7 @@ const submit_vote = score => {
 	});
 };
 
-const format_votes_results = (element, s_votes, n_votes) => {
+const format_pairwise_cell = (element, s_votes, n_votes) => {
 	if(n_votes === 0) {
 		/* no data */
 		return;
@@ -205,7 +205,7 @@ const format_votes_results = (element, s_votes, n_votes) => {
 	row.setAttribute('class', 'row');
 	let pbar = document.createElement('div');
 	element.appendChild(pbar);
-	pbar.setAttribute('class', 'progress');
+	pbar.setAttribute('class', 'progress-stacked');
 	pbar.setAttribute('style', 'height: 2px;');
 
         let col = document.createElement('div');
@@ -248,16 +248,21 @@ const format_votes_results = (element, s_votes, n_votes) => {
 	}
 };
 
-const format_results = (element, data) => {
+/* XXX: making a lot of assumptions here wrt model names */
+const model_base_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
+const model_quant_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
+
+const format_pairwise_results = (element, data) => {
 	let heading = document.createElement('h5');
 	element.appendChild(heading);
+	heading.classList.add('mt-4');
+	heading.classList.add('pt-4');
 	heading.textContent = 'Pairwise preference rate (lower bound, 99% confidence)';
 
-	/* XXX: making a lot of assumptions here wrt model names */
-	let table_name = k => k.match(/^(.+)[-.](q|iq|f|bf)[1-8]/i)[1];
-	let quant_name = k => k.match(/(^|[-.])((q|iq|f|bf)[1-8](.*?))([-.]|$)/i)[2];
-	let row_name = k => 'prefers ' + quant_name(k);
-	let col_name = k => 'vs ' + quant_name(k);
+	/* XXX: assuming all models share the same base name */
+	let table_name = model_base_name;
+        let row_name = k => 'prefers ' + model_quant_name(k);
+	let col_name = k => 'vs ' + model_quant_name(k);
 	let table = document.createElement('table');
 	element.appendChild(table);
 	table.setAttribute('data-ts', (new Date()).getTime());
@@ -290,18 +295,133 @@ const format_results = (element, data) => {
 		tbody.appendChild(tr);
 		for(let b in data.results[a]) {
 			let td = document.createElement('td');
-			if(a > b) {
-				format_votes_results(
-					td,
-					data.results[a][b][0],
-					data.results[a][b][1]
-				);
-			}
+			format_pairwise_cell(
+				td,
+				data.results[a][b][0],
+				data.results[a][b][1]
+			);
 			tr.appendChild(td);
 		}
 	}
-	$(thead).find('tr > th:last-child').remove();
-        $(tbody).find('tr:first-child, tr > td:last-child').remove();
+};
+
+const format_btl_results = (element, data) => {
+	let heading = document.createElement('h5');
+	element.appendChild(heading);
+	heading.textContent = 'Estimated model strength (BTL maximum likelihood estimation, 99% CI)';
+
+	let table = document.createElement('table'),
+	    tbody = document.createElement('tbody'),
+	    thead = document.createElement('thead'),
+	    tr = document.createElement('tr'), th, div;
+	element.appendChild(table);
+	table.appendChild(thead);
+	table.appendChild(tbody);
+	table.classList.add('table');
+	table.classList.add('table-striped');
+
+	thead.appendChild(tr);
+	th = document.createElement('th');
+        tr.appendChild(th);
+	th.classList.add('col-3');
+	th = document.createElement('th');
+	tr.appendChild(th);
+	th.classList.add('col-1');
+	th = document.createElement('th');
+	div = document.createElement('div');
+	tr.appendChild(th);
+	th.appendChild(div);
+	th.classList.add('col-8');
+	div.classList.add('container');
+	let row = document.createElement('div');
+	div.appendChild(row);
+	row.classList.add('row');
+	for(let e of [ [ 'Weaker', 'text-start' ], [ 'Stronger', 'text-end' ] ]) {
+		let col = document.createElement('div');
+		row.appendChild(col);
+		col.classList.add('col-6');
+		col.classList.add(e[1]);
+		col.textContent = e[0];
+	}
+
+	if($.isEmptyObject(data.results)) {
+		tr = document.createElement('tr');
+		tbody.appendChild(tr);
+		let td = document.createElement('td');
+		tr.appendChild(td);
+		td.classList.add('text-body-tertiary');
+		td.setAttribute('colwidth', '3');
+		return;
+	}
+
+	/* https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model */
+	const indices = Object.keys(data.results);
+	const n = indices.length;
+	const w = (i, j) => (-data.results[indices[i]][indices[j]][0] + data.results[indices[i]][indices[j]][1]) / 2.0;
+	let p = Array(n).fill(1.0);
+        for(let k = 0; k < 10; ++k) {
+		let p2 = p.slice(0, n);
+		for(let i = 0; i < n; ++i) {
+			let num = 0.0, denum = 0.0;
+			for(let j = 0; j < n; ++j) {
+				num += w(i, j) * p[j] / (p[i] + p[j]);
+				denum += w(j, i) / (p[i] + p[j]);
+			}
+			p2[i] = num/denum;
+		}
+		p = p2;
+	}
+
+	/* https://arxiv.org/abs/2110.03874 proposition 4.1 */
+	let ci = [];
+	for(let i = 0; i < n; ++i) {
+		let sum = 0.0;
+		for(let j = 0; j < n; ++j) {
+			let L = data.results[indices[i]][indices[j]][1];
+			let th = p[i] / p[j];
+                        sum += L * th / Math.pow(1 + th, 2.0);
+		}
+		ci.push(2.58 / Math.sqrt(sum));
+	}
+	let p_ci = [];
+	for(let i = 0; i < n; ++i) {
+		p_ci.push([
+			Math.exp(Math.log(p[i]) - ci[i]),
+			Math.exp(Math.log(p[i]) + ci[i]),
+		]);
+	}
+
+	let max = 0.0;
+	for(let i = 0; i < n; ++i) {
+		if(p_ci[i][1] > max) max = p_ci[i][1];
+	}
+
+	let i = 0;
+	for(let a in data.results) {
+		tr = document.createElement('tr');
+		tbody.appendChild(tr);
+		th = document.createElement('th');
+		tr.appendChild(th);
+		th.textContent = model_base_name(models[a]);
+		th = document.createElement('th');
+		tr.appendChild(th);
+		th.textContent = model_quant_name(models[a]);
+		let td = document.createElement('td');
+		tr.appendChild(td);
+                let pbar = document.createElement('div');
+		td.appendChild(pbar);
+		td.setAttribute('class', 'align-middle');
+		pbar.setAttribute('class', 'progress-stacked');
+                let pbe = document.createElement('div');
+		pbar.appendChild(pbe);
+		pbe.setAttribute('class', 'progress-bar bg-primary');
+		pbe.setAttribute('style', 'width: ' + (100.0 * p_ci[i][0] / max) + '%;');
+		pbe = document.createElement('div');
+		pbar.appendChild(pbe);
+		pbe.setAttribute('class', 'progress-bar bg-primary');
+		pbe.setAttribute('style', 'opacity: 0.5; width: ' + (100.0 * (p_ci[i][1] - p_ci[i][0]) / max) + '%;');
+		++i;
+	}
 };
 
 const show_section = (section_id, delay) => {
@@ -333,7 +453,8 @@ const maybe_refresh_results = a => {
 		ch.fadeIn(200);
 		post({ a: 'get-results-' + a }, data => {
 			ch.fadeOut(200).promise().done(() => {
-				format_results(ch.empty()[0], data);
+				format_btl_results(ch.empty()[0], data);
+				format_pairwise_results(ch[0], data);
 				ch.fadeIn(200);
 			});
 		});
