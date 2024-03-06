@@ -74,7 +74,8 @@ n_votes INTEGER NOT NULL,
 PRIMARY KEY(model_id_a, model_id_b, prompt_id),
 FOREIGN KEY(model_id_a) REFERENCES models(model_id),
 FOREIGN KEY(model_id_b) REFERENCES models(model_id),
-FOREIGN KEY(prompt_id) REFERENCES prompts(prompt_id)
+FOREIGN KEY(prompt_id) REFERENCES prompts(prompt_id),
+CHECK(model_id_a < model_id_b)
 ) WITHOUT ROWID;
 
 CREATE INDEX results_per_prompt_n_votes_idx ON results_per_prompt(model_id_a, model_id_b, n_votes);
@@ -157,6 +158,13 @@ SELECT a.model_id, b.model_id, 0, 0
 FROM models AS a
 JOIN models AS b ON a.model_id < b.model_id
 WHERE a.model_id = new.model_id OR b.model_id = new.model_id;
+END;
+
+CREATE TRIGGER prompt_insert AFTER INSERT ON prompts BEGIN
+INSERT INTO results_per_prompt(model_id_a, model_id_b, prompt_id, median_vote, n_votes)
+SELECT a.model_id, b.model_id, new.prompt_id, NULL, 0
+FROM models AS a
+JOIN models AS b ON a.model_id < b.model_id;
 END;
 
 CREATE TABLE rate_limit (
