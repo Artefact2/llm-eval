@@ -86,13 +86,13 @@ s_votes REAL,
 n_votes INTEGER,
 PRIMARY KEY(model_id_a, model_id_b),
 FOREIGN KEY(model_id_a) REFERENCES models(model_id),
-FOREIGN KEY(model_id_a) REFERENCES models(model_id),
+FOREIGN KEY(model_id_b) REFERENCES models(model_id),
 CHECK(model_id_a < model_id_b)
 ) WITHOUT ROWID;
 
 CREATE INDEX results_agg_n_votes_idx ON results_agg(n_votes);
 
-CREATE TRIGGER results_agg_update AFTER INSERT ON votes BEGIN
+CREATE TRIGGER vote_insert AFTER INSERT ON votes BEGIN
 INSERT OR REPLACE INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
 SELECT model_id_a, model_id_b, SUM(avg_vote), COUNT(avg_vote)
 FROM results_per_prompt
@@ -100,7 +100,7 @@ WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b
 GROUP BY model_id_a, model_id_b;
 END;
 
-CREATE TRIGGER results_agg_update AFTER DELETE ON votes BEGIN
+CREATE TRIGGER vote_delete AFTER DELETE ON votes BEGIN
 INSERT OR REPLACE INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
 SELECT model_id_a, model_id_b, SUM(avg_vote), COUNT(avg_vote)
 FROM results_per_prompt
@@ -108,12 +108,20 @@ WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b
 GROUP BY model_id_a, model_id_b;
 END;
 
-CREATE TRIGGER results_agg_update AFTER UPDATE ON votes BEGIN
+CREATE TRIGGER vote_update AFTER UPDATE ON votes BEGIN
 INSERT OR REPLACE INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
 SELECT model_id_a, model_id_b, SUM(avg_vote), COUNT(avg_vote)
 FROM results_per_prompt
 WHERE (model_id_a = old.model_id_a AND model_id_b = old.model_id_b) OR (model_id_a = new.model_id_a AND model_id_b = new.model_id_b)
 GROUP BY model_id_a, model_id_b;
+END;
+
+CREATE TRIGGER model_insert AFTER INSERT ON models BEGIN
+INSERT INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
+SELECT a.model_id, b.model_id, 0, 0
+FROM models AS a
+JOIN models AS b ON a.model_id < b.model_id
+WHERE a.model_id = new.model_id OR b.model_id = new.model_id;
 END;
 
 CREATE TABLE rate_limit (
