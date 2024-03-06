@@ -25,13 +25,17 @@ if($db->exec('BEGIN IMMEDIATE;') === false) {
 	die(1);
 }
 
-$stmt = $db->prepare('INSERT INTO prompts(prompt) VALUES(:prompt);');
-$stmt->bindParam(':prompt', $prompt);
+$sel_stmt = $db->prepare('SELECT prompt_id FROM prompts WHERE prompt = :prompt');
+$sel_stmt->bindParam(':prompt', $prompt);
+$ins_stmt = $db->prepare('INSERT INTO prompts(prompt) VALUES(:prompt);');
+$ins_stmt->bindParam(':prompt', $prompt);
 
 foreach($json as $prompt) {
 	$prompt = $prompt;
-	$stmt->execute();
-	echo '.';
+	if($sel_stmt->execute()->fetchArray() === false) {
+		$ins_stmt->execute();
+		echo '.';
+	}
 }
 
 $db->exec('COMMIT;');
