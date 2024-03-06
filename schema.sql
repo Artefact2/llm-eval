@@ -60,16 +60,6 @@ CHECK(model_id_a < model_id_b)
 CREATE INDEX votes_models_ab_session_id ON votes(session_id, model_id_a, model_id_b, vote);
 CREATE INDEX votes_models_ab_prompt_id ON votes(model_id_a, model_id_b, prompt_id, vote);
 
-CREATE VIEW voting_pairs AS
-SELECT sessions.session_id, prompts.prompt_id, prompt, a.model_id AS model_id_a, b.model_id AS model_id_b, a.answer AS answer_a, b.answer AS answer_b
-FROM prompts -- for all prompts...
-JOIN sessions -- and all sessions...
-JOIN answers AS a ON a.prompt_id = prompts.prompt_id -- join first answer
-LEFT JOIN voted_answers AS va ON va.session_id = sessions.session_id AND va.prompt_id = prompts.prompt_id AND va.model_id = a.model_id
-JOIN answers AS b ON b.prompt_id = prompts.prompt_id AND a.model_id < b.model_id -- join second answer
-LEFT JOIN voted_answers AS vb ON vb.session_id = sessions.session_id AND vb.prompt_id = prompts.prompt_id AND vb.model_id = b.model_id
-WHERE va.session_id IS NULL AND vb.session_id IS NULL; -- anti join already voted on answers
-
 CREATE VIEW results_per_session AS
 SELECT session_id, model_id_a, model_id_b, SUM(vote) AS s_votes, COUNT(vote) AS n_votes
 FROM votes
@@ -86,6 +76,21 @@ FOREIGN KEY(model_id_a) REFERENCES models(model_id),
 FOREIGN KEY(model_id_b) REFERENCES models(model_id),
 FOREIGN KEY(prompt_id) REFERENCES prompts(prompt_id)
 ) WITHOUT ROWID;
+
+CREATE INDEX results_per_prompt_n_votes_idx ON results_per_prompt(model_id_a, model_id_b, n_votes);
+
+CREATE VIEW voting_pairs AS
+SELECT sessions.session_id, rpp.prompt_id, rpp.model_id_a, rpp.model_id_b, p.prompt, aa.answer AS answer_a, ab.answer AS answer_b
+FROM sessions
+JOIN results_per_prompt AS rpp
+LEFT JOIN voted_answers AS va ON va.model_id = rpp.model_id_a AND va.prompt_id = rpp.prompt_id AND va.session_id = sessions.session_id
+LEFT JOIN voted_answers AS vb ON vb.model_id = rpp.model_id_b AND vb.prompt_id = rpp.prompt_id AND vb.session_id = sessions.session_id
+CROSS JOIN answers AS aa ON rpp.model_id_a = aa.model_id AND rpp.prompt_id = aa.prompt_id
+CROSS JOIN answers AS ab ON rpp.model_id_b = ab.model_id AND rpp.prompt_id = ab.prompt_id
+CROSS JOIN prompts AS p ON p.prompt_id = rpp.prompt_id
+WHERE va.model_id IS NULL AND vb.model_id IS NULL
+ORDER BY n_votes, random();
+
 
 CREATE TABLE results_agg (
 model_id_a INTEGER NOT NULL,

@@ -218,7 +218,7 @@ if($payload['a'] === 'get-voting-pair') {
 			$models[] = $row[1];
 		}
 	}
-	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_id_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
+	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_id_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q LIMIT 1;');
 	$p->bindValue(':sid', $sid);
 	$p->bindValue(':models', json_encode($models));
 	$p->bindValue(':p', $prune = (1<<$config['prune_voting_pairs']));
