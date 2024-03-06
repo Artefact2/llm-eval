@@ -122,14 +122,14 @@ GROUP BY model_id_a, model_id_b;
 END;
 
 CREATE TRIGGER vote_delete AFTER DELETE ON votes BEGIN
-DELETE FROM results_per_prompt WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b AND prompt_id = new.prompt_id;
+DELETE FROM results_per_prompt WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id;
 INSERT OR REPLACE INTO results_per_prompt(model_id_a, model_id_b, prompt_id, median_vote, n_votes)
-SELECT new.model_id_a, new.model_id_b, new.prompt_id, vote,
-(SELECT COUNT(*) FROM votes WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b AND prompt_id = new.prompt_id)
+SELECT old.model_id_a, old.model_id_b, old.prompt_id, vote,
+(SELECT COUNT(*) FROM votes WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id)
 FROM votes
-WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b AND prompt_id = new.prompt_id
+WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id
 ORDER BY vote ASC
-LIMIT 1 OFFSET CAST(0.5 * (SELECT COUNT(*) FROM votes WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b AND prompt_id = new.prompt_id) AS INTEGER);
+LIMIT 1 OFFSET CAST(0.5 * (SELECT COUNT(*) FROM votes WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id) AS INTEGER);
 INSERT OR REPLACE INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
 SELECT model_id_a, model_id_b, SUM(median_vote), COUNT(median_vote)
 FROM results_per_prompt
@@ -138,6 +138,14 @@ GROUP BY model_id_a, model_id_b;
 END;
 
 CREATE TRIGGER vote_update AFTER UPDATE ON votes BEGIN
+DELETE FROM results_per_prompt WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id;
+INSERT OR REPLACE INTO results_per_prompt(model_id_a, model_id_b, prompt_id, median_vote, n_votes)
+SELECT old.model_id_a, old.model_id_b, old.prompt_id, vote,
+(SELECT COUNT(*) FROM votes WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id)
+FROM votes
+WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id
+ORDER BY vote ASC
+LIMIT 1 OFFSET CAST(0.5 * (SELECT COUNT(*) FROM votes WHERE model_id_a = old.model_id_a AND model_id_b = old.model_id_b AND prompt_id = old.prompt_id) AS INTEGER);
 INSERT OR REPLACE INTO results_per_prompt(model_id_a, model_id_b, prompt_id, median_vote, n_votes)
 SELECT new.model_id_a, new.model_id_b, new.prompt_id, vote,
 (SELECT COUNT(*) FROM votes WHERE model_id_a = new.model_id_a AND model_id_b = new.model_id_b AND prompt_id = new.prompt_id)
