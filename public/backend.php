@@ -207,9 +207,20 @@ if($payload['a'] === 'get-voting-pair') {
 		$reply = [ 'status' => 'server-error', 'error' => 'failed to generate sid' ];
 		die();
 	}
+	$models = array_map('intval', $models);
+	if(count($models) > 2) {
+		$mq = $db->prepare('SELECT model_id_a, model_id_b FROM results_agg WHERE model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) ORDER BY n_votes ASC LIMIT 1;');
+		$mq->bindValue(':models', json_encode($models));
+		$mq = $mq->execute();
+		$models = [];
+		while($row = $mq->fetchArray(\SQLITE3_NUM)) {
+			$models[] = $row[0];
+			$models[] = $row[1];
+		}
+	}
 	$p = $db->prepare('SELECT session_id, prompt_id, model_id_a, model_id_b, prompt, answer_a, answer_b FROM voting_pairs WHERE session_id = :sid AND model_id_a IN (SELECT value FROM json_each(:models)) AND model_id_b IN (SELECT value FROM json_each(:models)) AND MOD(prompt_id, :p) = :q ORDER BY random() LIMIT 1;');
 	$p->bindValue(':sid', $sid);
-	$p->bindValue(':models', json_encode(array_map('intval', $models)));
+	$p->bindValue(':models', json_encode($models));
 	$p->bindValue(':p', $prune = (1<<$config['prune_voting_pairs']));
 	$p->bindValue(':q', rand() & ($prune-1));
 	$pair = $p->execute()->fetchArray(\SQLITE3_ASSOC);

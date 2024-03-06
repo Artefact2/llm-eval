@@ -90,6 +90,8 @@ FOREIGN KEY(model_id_a) REFERENCES models(model_id),
 CHECK(model_id_a < model_id_b)
 ) WITHOUT ROWID;
 
+CREATE INDEX results_agg_n_votes_idx ON results_agg(n_votes);
+
 CREATE TRIGGER results_agg_update AFTER INSERT ON votes BEGIN
 INSERT OR REPLACE INTO results_agg(model_id_a, model_id_b, s_votes, n_votes)
 SELECT model_id_a, model_id_b, SUM(avg_vote), COUNT(avg_vote)
