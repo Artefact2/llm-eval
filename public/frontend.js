@@ -104,6 +104,7 @@ const parse_and_sanitize_md = s => {
 		KEEP_CONTENT: true,
 	};
 	let frag = DOMPurify.sanitize(marked.parse(s), config);
+	$(frag).find('table').addClass('table table-striped');
 	if(frag) return frag;
 	/* some prompts/answers have things that *look* like HTML, but are not
 	 * (eg, C++ templates like Foo<Bar>), and this trips up the sanitizer.
@@ -465,7 +466,7 @@ const maybe_refresh_results = a => {
 
 $(() => {
 	$('div#javascript-check').remove();
-	marked.use(markedXhtml.markedXhtml());
+	marked.use(markedXhtml.markedXhtml(), { breaks: true });
 
 	let disclaimer_shown = false;
 	$("section#play").on('my-show', () => {
