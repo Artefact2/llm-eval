@@ -11,7 +11,7 @@ public/bootstrap.css:
 # can be useful when generating new answers on another database.
 # import with $(xzcat answers.sql.xz | sqlite3 -bail db.sqlite)
 answers.sql.xz: db.sqlite
-	(echo "BEGIN;"; printf ".mode insert prompts\nselect * from prompts;\n.mode insert answers\nselect * from answers;\n" | sqlite3 -init /dev/fd/0 db.sqlite; echo "COMMIT;") | sed 's/^INSERT INTO/INSERT OR IGNORE INTO/g' | xz -0v > $@.tmp
+	(echo "BEGIN;"; printf ".mode insert models\nselect * from models;\n.mode insert prompts\nselect * from prompts;\n.mode insert answers\nselect * from answers;\n" | sqlite3 -init /dev/fd/0 db.sqlite; echo "COMMIT;") | sed 's/^INSERT INTO/INSERT OR IGNORE INTO/g' | xz -0v > $@.tmp
 	mv -f $@.tmp $@
 
 host:
