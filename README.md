@@ -5,6 +5,8 @@ under the Apache License, version 2.0.
 
 Dependencies: PHP, SQLite3.
 
+[**See a live demo here.**](https://freya.artefact2.com/llm-eval/)
+
 # Quickstart guide
 
 ```
