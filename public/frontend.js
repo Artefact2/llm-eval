@@ -454,7 +454,39 @@ const maybe_refresh_results = a => {
 		ch.fadeIn(200);
 		post({ a: 'get-results-' + a }, data => {
 			ch.fadeOut(200).promise().done(() => {
-				format_btl_results(ch.empty()[0], data);
+				ch.empty();
+				let n_votes = 0;
+				let min_votes = Number.MAX_VALUE, min_pair;
+				let max_votes = Number.MIN_VALUE, max_pair;
+				let nf = new Intl.NumberFormat();
+				for(let ma in data.results) {
+					for(let mb in data.results[ma]) {
+						if(ma >= mb) continue;
+						let n = data.results[ma][mb][1];
+						n_votes += data.results[ma][mb][1];
+						if(n > max_votes) {
+							max_votes = n;
+							max_pair = [ ma, mb ];
+						}
+						if(n < min_votes) {
+							min_votes = n;
+							min_pair = [ ma, mb ];
+						}
+					}
+				}
+				let ul = document.createElement('ul'), li = document.createElement('li');
+				li.textContent = 'Using aggregated data of N=' + nf.format(n_votes) + ' votes.';
+				ul.appendChild(li);
+				if(n_votes > 0) {
+					li = document.createElement('li');
+					li.textContent = 'Most voted model pair: ' + models[max_pair[0]] + ' vs ' + models[max_pair[1]] + ' (' + nf.format(max_votes) + ' votes).';
+					ul.appendChild(li);
+					li = document.createElement('li');
+					li.textContent = 'Least voted model pair: ' + models[min_pair[0]] + ' vs ' + models[min_pair[1]] + ' (' + nf.format(min_votes) + ' votes).';
+					ul.appendChild(li);
+				}
+				ch[0].appendChild(ul);
+				format_btl_results(ch[0], data);
 				format_pairwise_results(ch[0], data);
 				ch.fadeIn(200);
 			});
